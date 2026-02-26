@@ -120,35 +120,24 @@ medium2md/
 Milestone 1 — MVP
 
 - ZIP ingestion
-
 - Post detection
-
 - HTML normalization
-
 - Markdown conversion
-
 - Hugo bundle writing
-
 - Basic image localization
 
 Milestone 2 — Robustness
 
 - Incremental state tracking
-
 - Slug collision handling
-
 - Metadata fallback logic
-
 - Verify command
 
 Milestone 3 — Polish
 
 - Embed conversion (YouTube, Twitter, Gist)
-
 - Theme config mapping
-
 - Pandoc backend option
-
 - Internal link rewriting
 
 ### Philosophy
