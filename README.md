@@ -13,6 +13,10 @@ content/posts/<slug>/
 
 This enables full ownership of your content and a clean migration from Medium to Hugo.
 
+## Status
+
+This project is in early scaffolding/development. Core files (`cli.py`, `main.py`, `__init__.py`) exist at the repo root. No pipeline modules have been implemented yet.
+
 ## Why This Exists
 
 Medium allows you to export your account data as a ZIP archive, but the export:
@@ -37,8 +41,9 @@ This tool is designed to be:
 - CI-friendly
 - Hugo-native
 
-Features (MVP → Planned)
-## MVP
+## Features
+
+### MVP
 
 - Convert Medium export ZIP
 - Extract title, date, canonical URL
@@ -48,7 +53,7 @@ Features (MVP → Planned)
 - Download and rewrite image links
 - Generate conversion report
 
-## Planned
+### Planned
 
 - Incremental runs via state file
 - Embed detection and shortcode conversion
@@ -98,22 +103,16 @@ medium:
 ### Project Structure
 
 ```
-medium2md/
-  medium2md/
-    __init__.py
-    cli.py
-    export_reader.py
-    post_parser.py
-    html_normalize.py
-    md_convert.py
-    assets.py
-    front_matter.py
-    state.py
-    report.py
-  tests/
+medium2md/       (repo root)
+  __init__.py
+  cli.py
+  main.py
   pyproject.toml
   README.md
+  project-plan.md
 ```
+
+> **Note:** The package will be restructured into the `medium2md/medium2md/` subdirectory as development progresses.
 
 ### Development Roadmap
 
@@ -161,9 +160,9 @@ The goal is correctness first, cleverness later.
 
 - Fork the repo
 - Create a feature branch
-- Run:
-  - `uv run pytest`
-- Submit PR
+- Make your changes
+- Run tests: `uv run pytest`
+- Open a pull request
 
 ### License
 

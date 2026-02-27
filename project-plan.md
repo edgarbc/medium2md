@@ -22,6 +22,19 @@
 
 - Continuous sync with Medium (export-based conversion first; “crawl mode” can be v2).
 
+## Current Status
+
+The project is in the **scaffolding phase**. The following files currently exist at the repo root (not yet under the planned `medium2md/` package subdirectory):
+
+- `cli.py`
+- `main.py`
+- `__init__.py`
+- `pyproject.toml`
+- `README.md`
+- `project-plan.md`
+
+No pipeline modules have been implemented yet. The package will be restructured into the `medium2md/medium2md/` subdirectory as development progresses.
+
 Recommended output structure for Hugo
 
 Use page bundles:
@@ -133,7 +146,7 @@ medium2md/
   pyproject.toml
   README.md
   LICENSE
-`
+```
 ### Package as an installable CLI with pyproject.toml and a console script entry point.
 
 ### Medium export ingestion
@@ -384,62 +397,43 @@ commit generated content/posts/*
 
 Hugo builds site on GitHub Pages / Netlify / Cloudflare Pages
 
-Milestones (build order)
-Milestone 1 (MVP)
+## Milestones (build order)
 
-convert command works for export.zip
+### Milestone 1 (MVP)
 
-Extract title/date/canonical reliably for most posts
+- [ ] convert command works for export.zip
+- [ ] Extract title/date/canonical reliably for most posts
+- [ ] HTML normalize minimal
+- [ ] Convert HTML → MD
+- [ ] Write Hugo bundles
+- [ ] Basic image download + rewrite
+- [ ] Generate report
 
-HTML normalize minimal
+### Milestone 2 (robustness)
 
-Convert HTML → MD
-
-Write Hugo bundles
-
-Basic image download + rewrite
-
-Generate report
-
-Milestone 2 (robustness)
-
-Incremental state
-
-Slug collision handling
-
-Better metadata extraction fallback paths
-
-verify command
+- [ ] Incremental state
+- [ ] Slug collision handling
+- [ ] Better metadata extraction fallback paths
+- [ ] verify command
 
 ### Milestone 3 (polish)
 
-Better embed conversions (YouTube/Twitter/Gist)
+- [ ] Better embed conversions (YouTube/Twitter/Gist)
+- [ ] Theme mapping config
+- [ ] Optional pandoc backend
+- [ ] Link rewriting among your posts (optional)
 
-Theme mapping config
+## Concrete “first sprint” checklist (what to implement first)
 
-Optional pandoc backend
-
-Link rewriting among your posts (optional)
-
-Concrete “first sprint” checklist (what to implement first)
-
-Scaffold typer CLI with convert <zip> --out ...
-
-Unzip and list candidate HTML files
-
-Parse each HTML:
-
-find canonical url, title, date, main content node
-
-Normalize HTML (strip junk)
-
-Convert to Markdown (markdownify)
-
-Download images + rewrite links
-
-Write page bundle + front matter
-
-Save state.json + report.json
+- [ ] Scaffold typer CLI with convert <zip> --out ...
+- [ ] Unzip and list candidate HTML files
+- [ ] Parse each HTML:
+  - [ ] find canonical url, title, date, main content node
+- [ ] Normalize HTML (strip junk)
+- [ ] Convert to Markdown (markdownify)
+- [ ] Download images + rewrite links
+- [ ] Write page bundle + front matter
+- [ ] Save state.json + report.json
 
 If you tell me:
 
