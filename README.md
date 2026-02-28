@@ -1,7 +1,7 @@
 # medium2md
 
-[![PyPI version](https://img.shields.io/pypi/v/medium2md.svg)](https://pypi.org/project/medium2md/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/medium2md.svg)](https://pypi.org/project/medium2md/)
+[![PyPI version](https://img.shields.io/pypi/v/medium2md-cli.svg)](https://pypi.org/project/medium2md-cli/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/medium2md-cli.svg)](https://pypi.org/project/medium2md-cli/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > Convert a Medium export ZIP into clean, Hugo-ready Markdown page bundles.
@@ -84,10 +84,12 @@ uv sync
 Once published to PyPI, install with:
 
 ```bash
-pip install medium2md
+pip install medium2md-cli
 # or with uv:
-uv tool install medium2md
+uv tool install medium2md-cli
 ```
+
+The CLI command is still `medium2md`.
 
 ---
 

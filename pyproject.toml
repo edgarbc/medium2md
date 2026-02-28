@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "medium2md"
+name = "medium2md-cli"
 version = "0.1.0"
 description = "Convert a Medium export ZIP into Hugo-ready Markdown page bundles with localized images."
 readme = "README.md"
@@ -44,3 +44,6 @@ Documentation = "https://github.com/edgarbc/medium2md#readme"
 
 [project.optional-dependencies]
 dev = ["twine>=6.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["medium2md"]
