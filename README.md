@@ -94,7 +94,7 @@ Copy your Medium export ZIP into the `input/` directory (already set up and git-
 
 ```bash
 cp ~/Downloads/medium-export.zip input/
-uv run medium2md convert input/medium-export.zip --out ../blog/content/posts
+uv run medium2md input/medium-export.zip --out ../blog/content/posts
 ```
 
 > **Note:** The `input/` directory is tracked by git (via `.gitkeep`) so it exists after a fresh clone, but its contents are ignored — your ZIP files will never be accidentally committed.
@@ -135,14 +135,23 @@ content/posts/
 ## Project Structure
 
 ```
-medium2md/           <- repository root
-├── medium2md/       <- Python package
+medium2md/           
+├── medium2md/       
 │   ├── __init__.py
 │   ├── cli.py
 │   └── main.py
 ├── pyproject.toml
 ├── README.md
-└── project-plan.md
+├── project-plan.md
+└── input/
+    └── medium-export.zip
+├── output/
+    └── content/
+        └── posts/
+            └── my-post-slug/
+                ├── index.md
+                └── images/
+                    └── cover.jpg
 ```
 
 ### Pipeline Architecture

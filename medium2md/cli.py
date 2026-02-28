@@ -14,6 +14,18 @@ def convert(
     out: Path = typer.Option(Path("content/posts"), "--out", "-o"),
 ):
     out = out.resolve()
+    if not out.exists():
+        if not typer.confirm(
+            f"Output directory does not exist: {out}\nCreate it?",
+            default=True,
+        ):
+            raise typer.Exit(1)
+        out.mkdir(parents=True, exist_ok=True)
+        typer.echo(f"Created {out}")
+    elif not out.is_dir():
+        typer.echo(f"Error: Output path is not a directory: {out}", err=True)
+        raise typer.Exit(1)
+
     typer.echo(f"Export: {export_zip}")
     typer.echo(f"Out:    {out}")
 
