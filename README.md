@@ -15,7 +15,7 @@ This enables full ownership of your content and a clean migration from Medium to
 
 ## Status
 
-This project is in early scaffolding/development. Core files (`cli.py`, `main.py`, `__init__.py`) exist at the repo root. No pipeline modules have been implemented yet.
+This project is in early scaffolding/development. Core files (`cli.py`, `main.py`, `__init__.py`) live under the `medium2md/` package subdirectory. No pipeline modules have been implemented yet.
 
 ## Why This Exists
 
@@ -104,15 +104,14 @@ medium:
 
 ```
 medium2md/       (repo root)
-  __init__.py
-  cli.py
-  main.py
+  medium2md/     (Python package)
+    __init__.py
+    cli.py
+    main.py
   pyproject.toml
   README.md
   project-plan.md
 ```
-
-> **Note:** The package will be restructured into the `medium2md/medium2md/` subdirectory as development progresses.
 
 ### Development Roadmap
 

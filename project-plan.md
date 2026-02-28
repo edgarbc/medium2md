@@ -24,16 +24,16 @@
 
 ## Current Status
 
-The project is in the **scaffolding phase**. The following files currently exist at the repo root (not yet under the planned `medium2md/` package subdirectory):
+The project is in the **scaffolding phase**. The following files currently exist under the `medium2md/` package subdirectory:
 
-- `cli.py`
-- `main.py`
-- `__init__.py`
+- `medium2md/cli.py`
+- `medium2md/main.py`
+- `medium2md/__init__.py`
 - `pyproject.toml`
 - `README.md`
 - `project-plan.md`
 
-No pipeline modules have been implemented yet. The package will be restructured into the `medium2md/medium2md/` subdirectory as development progresses.
+No pipeline modules have been implemented yet.
 
 Recommended output structure for Hugo
 
