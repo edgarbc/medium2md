@@ -57,7 +57,7 @@ This tool is designed to be **deterministic**, **reproducible**, and **CI-friend
 - Create Hugo page bundles with `index.md` and optional `images/`
 - Image localization: download remote images into the bundle; copy local images when present in the export
 - Basic slug collision handling (`slug-2`, `slug-3`, …)
-- Terminal progress and summary (missing output dir prompt when needed)
+- Terminal progress and summary; per-post image count; prompt to create missing output dir
 
 ### Planned
 
@@ -81,10 +81,12 @@ cd medium2md
 uv sync
 ```
 
-Once published to PyPI, you will also be able to install it with:
+Once published to PyPI, install with:
 
 ```bash
 pip install medium2md
+# or with uv:
+uv tool install medium2md
 ```
 
 ---
@@ -166,8 +168,8 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 
 | Milestone | Focus | Status |
 |---|---|---|
-| 1 — MVP | ZIP ingestion, HTML→Markdown, Hugo bundle writing, image localization | 🚧 In Progress |
-| 2 — Robustness | Incremental state tracking, slug collision handling, metadata fallback, verify command | 📋 Planned |
+| 1 — MVP | ZIP ingestion, HTML→Markdown, Hugo bundle writing, image localization | ✅ Done |
+| 2 — Robustness | Incremental state tracking, metadata fallback, verify command | 📋 Planned |
 | 3 — Polish | Embed conversion, theme config mapping, Pandoc backend, internal link rewriting | 📋 Planned |
 
 ---
@@ -179,10 +181,16 @@ Contributions are welcome! To get started:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feat/my-feature`)
 3. Make your changes
-4. Run tests: `uv run pytest`
-5. Open a pull request
+4. Open a pull request (run `uv run medium2md --help` to confirm the CLI works)
 
 ---
+
+## Publishing to PyPI (maintainers)
+
+1. Bump `version` in `pyproject.toml`.
+2. Build: `uv build` (creates `dist/`).
+3. Install dev deps and upload: `uv sync --extra dev` then `uv run twine upload dist/*` (requires a [PyPI API token](https://pypi.org/help/#apitoken); use `__token__` as username).
+4. Optionally tag the release: `git tag v0.1.0 && git push --tags`.
 
 ## License
 

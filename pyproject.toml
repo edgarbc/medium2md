@@ -5,9 +5,23 @@ build-backend = "hatchling.build"
 [project]
 name = "medium2md"
 version = "0.1.0"
-description = "Add your description here"
+description = "Convert a Medium export ZIP into Hugo-ready Markdown page bundles with localized images."
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.13"
+authors = [
+    { name = "Edgar Bermudez", url = "https://github.com/edgarbc" }
+]
+keywords = ["medium", "hugo", "markdown", "export", "migration", "static-site"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup",
+]
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "httpx>=0.28.1",
@@ -17,8 +31,16 @@ dependencies = [
     "python-slugify>=8.0.4",
     "pyyaml>=6.0.3",
     "rich>=14.3.3",
-    "typer[all]>=0.24.1",
+    "typer>=0.24.1",
 ]
 
 [project.scripts]
 medium2md = "medium2md.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/edgarbc/medium2md"
+Repository = "https://github.com/edgarbc/medium2md"
+Documentation = "https://github.com/edgarbc/medium2md#readme"
+
+[project.optional-dependencies]
+dev = ["twine>=6.0"]

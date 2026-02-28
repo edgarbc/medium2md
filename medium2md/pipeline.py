@@ -1,6 +1,7 @@
 """Minimal conversion pipeline: find post HTML, parse, convert to Markdown, write Hugo bundles."""
 
 import shutil
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -13,6 +14,12 @@ try:
     import httpx
 except ImportError:
     httpx = None  # type: ignore[assignment]
+
+# Request like a browser so Medium's CDN serves images
+IMAGE_REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/119.0",
+    "Accept": "image/avif,image/webp,image/png,image/svg+xml,image/*,*/*;q=0.8",
+}
 
 
 # Non-post directories in Medium export (utility pages)
@@ -101,11 +108,12 @@ def _localize_images(
     html_path: Path,
     tmp_dir: Path,
     bundle_dir: Path,
-) -> None:
-    """In-place: resolve each img src to a local file or download, copy into bundle/images/, set src to images/<name>."""
+) -> int:
+    """In-place: resolve each img src to a local file or download, copy into bundle/images/, set src to images/<name>. Returns count of images localized."""
     images_dir = bundle_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
     imgs = article_soup.find_all("img", src=True)
+    localized = 0
     for i, img in enumerate(imgs, 1):
         src = img["src"].strip()
         if not src:
@@ -124,30 +132,48 @@ def _localize_images(
             dest = images_dir / dest_name
             shutil.copy2(resolved, dest)
             img["src"] = f"images/{dest_name}"
+            localized += 1
             continue
-        # Remote URL: download
+        # Remote URL: download (with User-Agent and retry so CDNs don't block)
         if not httpx:
             continue
-        try:
-            r = httpx.get(src, follow_redirects=True, timeout=30)
-            r.raise_for_status()
-            ct = r.headers.get("content-type", "")
-            ext = _extension_for_url(src, ct)
-            dest_name = f"{i}{ext}"
-            dest = images_dir / dest_name
-            dest.write_bytes(r.content)
-            img["src"] = f"images/{dest_name}"
-        except Exception:
-            # Leave src unchanged on failure (keep remote URL)
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                r = httpx.get(
+                    src,
+                    follow_redirects=True,
+                    timeout=45,
+                    headers=IMAGE_REQUEST_HEADERS,
+                )
+                r.raise_for_status()
+                if len(r.content) == 0:
+                    raise ValueError("empty response")
+                ct = r.headers.get("content-type", "")
+                ext = _extension_for_url(src, ct)
+                dest_name = f"{i}{ext}"
+                dest = images_dir / dest_name
+                dest.write_bytes(r.content)
+                img["src"] = f"images/{dest_name}"
+                localized += 1
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < 1:
+                    time.sleep(0.5 + attempt)
+        if last_error is not None:
+            # Leave src unchanged so the MD still has the URL; user can fix manually
             pass
+    return localized
 
 
 def convert_html_file(
     html_path: Path,
     tmp_dir: Path,
     bundle_dir: Path,
-) -> tuple[str, str | None, str]:
-    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, markdown_body)."""
+) -> tuple[str, str | None, str, int]:
+    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, markdown_body, num_images_localized)."""
     raw = html_path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "lxml")
     title = _extract_title(soup)
@@ -155,9 +181,10 @@ def convert_html_file(
     article_html = _extract_article_html(soup)
     if not article_html:
         body_md = ""
+        localized = 0
     else:
         article_soup = BeautifulSoup(article_html, "lxml")
-        _localize_images(article_soup, html_path, tmp_dir, bundle_dir)
+        localized = _localize_images(article_soup, html_path, tmp_dir, bundle_dir)
         body_md = md(
             str(article_soup),
             heading_style="ATX",
@@ -165,7 +192,7 @@ def convert_html_file(
             escape_asterisks=False,
             escape_underscores=False,
         )
-    return title, canonical, (body_md or "").strip()
+    return title, canonical, (body_md or "").strip(), localized
 
 
 def slug_from_post(title: str, canonical: str | None) -> str:

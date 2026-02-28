@@ -74,10 +74,11 @@ def convert(
                 used_slugs.add(slug)
                 bundle_dir = out / slug
                 bundle_dir.mkdir(parents=True, exist_ok=True)
-                title, canonical, body_md = convert_html_file(html_path, tmp_dir, bundle_dir)
+                title, canonical, body_md, num_images = convert_html_file(html_path, tmp_dir, bundle_dir)
                 write_bundle(out, slug, title, canonical, body_md)
                 written += 1
-                typer.echo(f"  [{i}/{len(post_files)}] {slug}  →  {out / slug / 'index.md'}")
+                img_info = f" ({num_images} image(s))" if num_images else ""
+                typer.echo(f"  [{i}/{len(post_files)}] {slug}  →  {out / slug / 'index.md'}{img_info}")
             except Exception as e:
                 errors += 1
                 typer.echo(
