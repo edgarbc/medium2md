@@ -38,7 +38,7 @@ Medium allows you to export your account data as a ZIP archive, but the raw expo
 |---|---|
 | HTML → Markdown | Converts Medium HTML posts to clean Markdown |
 | Hugo front matter | Generates YAML front matter from post metadata |
-| Image localization | Downloads and rewrites remote image links |
+| Image localization | Downloads remote images into each bundle; copies local images when present in the export |
 | Canonical URL | Preserves the original Medium URL |
 | Conversion reports | Summarizes what was converted and what was skipped |
 | Incremental re-runs | *(planned)* Re-run only changed posts |
@@ -51,22 +51,23 @@ This tool is designed to be **deterministic**, **reproducible**, and **CI-friend
 
 ### MVP (current)
 
-- Convert Medium export ZIP
-- Extract title, date, and canonical URL
-- Normalize Medium HTML
+- Convert Medium export ZIP (posts under `posts/` in the export)
+- Extract title and canonical URL; generate slug
 - Convert HTML to Markdown
-- Create Hugo page bundles
-- Download and rewrite image links
-- Generate a conversion report
+- Create Hugo page bundles with `index.md` and optional `images/`
+- Image localization: download remote images into the bundle; copy local images when present in the export
+- Basic slug collision handling (`slug-2`, `slug-3`, …)
+- Terminal progress and summary (missing output dir prompt when needed)
 
 ### Planned
 
+- Extract date and optional metadata (tags, etc.) into front matter
 - Incremental runs via state file
 - Embed detection and shortcode conversion (YouTube, Twitter, Gist)
 - Pandoc backend option
-- Slug collision handling
 - Verification command
 - Theme-specific front matter mapping
+- Conversion report (e.g. JSON/file)
 
 ---
 
@@ -101,33 +102,34 @@ uv run medium2md input/medium-export.zip --out ../blog/content/posts
 
 ### Front Matter Example
 
-Each converted post produces an `index.md` with Hugo-compatible YAML front matter:
+Each converted post produces an `index.md` with Hugo-compatible YAML front matter. Current output:
 
 ```yaml
 ---
 title: "My Post Title"
-date: 2022-04-18T10:03:00Z
-lastmod: 2022-06-01T15:10:00Z
 draft: true
-tags: ["tag1", "tag2"]
 slug: "my-post-slug"
 medium:
   canonical: "https://medium.com/@you/post-slug"
 ---
 ```
 
+Additional keys (e.g. `date`, `lastmod`, `tags`) are planned.
+
 ---
 
 ## Output Structure
 
-Each Medium post becomes a Hugo page bundle:
+Each Medium post becomes a Hugo page bundle. Image links in the Markdown point into the bundle’s `images/` folder (remote images are downloaded; local images from the export are copied):
 
 ```
 content/posts/
 └── my-post-slug/
     ├── index.md
     └── images/
-        └── cover.jpg
+        ├── 1.png
+        ├── 2.jpg
+        └── …
 ```
 
 ---
@@ -135,32 +137,25 @@ content/posts/
 ## Project Structure
 
 ```
-medium2md/           
-├── medium2md/       
+medium2md/
+├── medium2md/
 │   ├── __init__.py
 │   ├── cli.py
+│   ├── pipeline.py
 │   └── main.py
 ├── pyproject.toml
 ├── README.md
 ├── project-plan.md
 └── input/
     └── medium-export.zip
-├── output/
-    └── content/
-        └── posts/
-            └── my-post-slug/
-                ├── index.md
-                └── images/
-                    └── cover.jpg
 ```
 
 ### Pipeline Architecture
 
-medium2md follows a layered pipeline where each stage is isolated, testable, and composable:
+medium2md follows a layered pipeline:
 
 ```
-ZIP -> HTML parsing -> DOM normalization -> Markdown conversion
-    -> Asset localization -> Front matter generation -> Hugo bundle writing -> Report
+ZIP → extract → find posts → parse HTML → localize images (copy/download) → Markdown conversion → front matter + Hugo bundle write
 ```
 
 > **Philosophy:** Correctness first, cleverness later.
