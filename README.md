@@ -90,9 +90,14 @@ pip install medium2md
 
 ## Usage
 
+Copy your Medium export ZIP into the `input/` directory (already set up and git-ignored):
+
 ```bash
-uv run medium2md convert export.zip --out ../blog/content/posts
+cp ~/Downloads/medium-export.zip input/
+uv run medium2md convert input/medium-export.zip --out ../blog/content/posts
 ```
+
+> **Note:** The `input/` directory is tracked by git (via `.gitkeep`) so it exists after a fresh clone, but its contents are ignored — your ZIP files will never be accidentally committed.
 
 ### Front Matter Example
 
