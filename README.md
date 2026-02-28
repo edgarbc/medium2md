@@ -198,6 +198,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-> Built by [Edgar Bermudez](https://github.com/edgarbc) to enable long-term content ownership and reproducible publishing workflows.
+> Built by [Edgar Bermudez](https://github.com/edgarbc) and [GitHub Copilot](https://github.com/features/copilot) with 💖 to enable long-term content ownership and reproducible publishing workflows.
 >
 > Not affiliated with Medium or any of its subsidiaries.
