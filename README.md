@@ -1,93 +1,104 @@
-# Medium2MD
+# medium2md
 
-Convert a Medium export ZIP into clean, Hugo-ready Markdown page bundles.
+[![PyPI version](https://img.shields.io/pypi/v/medium2md.svg)](https://pypi.org/project/medium2md/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/medium2md.svg)](https://pypi.org/project/medium2md/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-medium2md is a CLI tool that transforms Medium’s HTML export into properly structured Hugo content using page bundles:
+> Convert a Medium export ZIP into clean, Hugo-ready Markdown page bundles.
 
-```
-content/posts/<slug>/
-  index.md
-  images/*
-  optional featured.*
-```
+**medium2md** is a CLI tool that transforms Medium's HTML export into properly structured [Hugo](https://gohugo.io/) content using page bundles — enabling full ownership of your content and a clean, reproducible migration from Medium to Hugo.
 
-This enables full ownership of your content and a clean migration from Medium to Hugo.
+---
 
-## Status
+## Table of Contents
 
-This project is in early scaffolding/development. Core files (`cli.py`, `main.py`, `__init__.py`) live under the `medium2md/` package subdirectory. No pipeline modules have been implemented yet.
+- [Why This Exists](#why-this-exists)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Output Structure](#output-structure)
+- [Project Structure](#project-structure)
+- [Development Roadmap](#development-roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
 
 ## Why This Exists
 
-Medium allows you to export your account data as a ZIP archive, but the export:
+Medium allows you to export your account data as a ZIP archive, but the raw export:
 
-- Contains raw HTML
+- Contains unstructured HTML
 - Includes inconsistent metadata
-- Uses remote image links
+- References remote image URLs
 
-medium2md provides:
+**medium2md** solves this by providing:
 
-- HTML → Markdown conversion
-- Hugo front matter generation
-- Image localization into page bundles
-- Canonical URL preservation
-- Conversion reports
-- Incremental re-runs (planned)
+| Feature | Description |
+|---|---|
+| HTML → Markdown | Converts Medium HTML posts to clean Markdown |
+| Hugo front matter | Generates YAML front matter from post metadata |
+| Image localization | Downloads and rewrites remote image links |
+| Canonical URL | Preserves the original Medium URL |
+| Conversion reports | Summarizes what was converted and what was skipped |
+| Incremental re-runs | *(planned)* Re-run only changed posts |
 
-This tool is designed to be:
+This tool is designed to be **deterministic**, **reproducible**, and **CI-friendly**.
 
-- Deterministic
-- Reproducible
-- CI-friendly
-- Hugo-native
+---
 
 ## Features
 
-### MVP
+### MVP (current)
 
 - Convert Medium export ZIP
-- Extract title, date, canonical URL
+- Extract title, date, and canonical URL
 - Normalize Medium HTML
-- Convert to Markdown
+- Convert HTML to Markdown
 - Create Hugo page bundles
 - Download and rewrite image links
-- Generate conversion report
+- Generate a conversion report
 
 ### Planned
 
 - Incremental runs via state file
-- Embed detection and shortcode conversion
+- Embed detection and shortcode conversion (YouTube, Twitter, Gist)
 - Pandoc backend option
 - Slug collision handling
 - Verification command
 - Theme-specific front matter mapping
 
-## This project uses uv.
+---
 
-- Clone the repo
-- `git clone https://github.com/<your-username>/medium2md.git`
-- `cd medium2md`
-- Install dependencies
-- `uv sync`
+## Installation
 
-### Example:
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management.
 
-`uv run medium2md convert export.zip \
-  --out ../blog/content/posts`
-
-### Output Structure
-
-Each Medium post becomes a Hugo page bundle:
-
-```
-content/posts/my-post-slug/
-  index.md
-  images/*
+```bash
+git clone https://github.com/edgarbc/medium2md.git
+cd medium2md
+uv sync
 ```
 
-### Front matter example:
+Once published to PyPI, you will also be able to install it with:
 
+```bash
+pip install medium2md
 ```
+
+---
+
+## Usage
+
+```bash
+uv run medium2md convert export.zip --out ../blog/content/posts
+```
+
+### Front Matter Example
+
+Each converted post produces an `index.md` with Hugo-compatible YAML front matter:
+
+```yaml
 ---
 title: "My Post Title"
 date: 2022-04-18T10:03:00Z
@@ -100,78 +111,76 @@ medium:
 ---
 ```
 
-### Project Structure
+---
+
+## Output Structure
+
+Each Medium post becomes a Hugo page bundle:
 
 ```
-medium2md/       (repo root)
-  medium2md/     (Python package)
-    __init__.py
-    cli.py
-    main.py
-  pyproject.toml
-  README.md
-  project-plan.md
+content/posts/
+└── my-post-slug/
+    ├── index.md
+    └── images/
+        └── cover.jpg
 ```
 
-### Development Roadmap
+---
 
-Milestone 1 — MVP
+## Project Structure
 
-- ZIP ingestion
-- Post detection
-- HTML normalization
-- Markdown conversion
-- Hugo bundle writing
-- Basic image localization
+```
+medium2md/           <- repository root
+├── medium2md/       <- Python package
+│   ├── __init__.py
+│   ├── cli.py
+│   └── main.py
+├── pyproject.toml
+├── README.md
+└── project-plan.md
+```
 
-Milestone 2 — Robustness
+### Pipeline Architecture
 
-- Incremental state tracking
-- Slug collision handling
-- Metadata fallback logic
-- Verify command
+medium2md follows a layered pipeline where each stage is isolated, testable, and composable:
 
-Milestone 3 — Polish
+```
+ZIP -> HTML parsing -> DOM normalization -> Markdown conversion
+    -> Asset localization -> Front matter generation -> Hugo bundle writing -> Report
+```
 
-- Embed conversion (YouTube, Twitter, Gist)
-- Theme config mapping
-- Pandoc backend option
-- Internal link rewriting
+> **Philosophy:** Correctness first, cleverness later.
 
-### Philosophy
+---
 
-This tool follows a layered pipeline:
+## Development Roadmap
 
-- ZIP
-- HTML parsing
-- DOM normalization
-- Markdown conversion
-- Asset localization
-    - Front matter generation
-    - Hugo bundle writing
-    - Report generation
+| Milestone | Focus | Status |
+|---|---|---|
+| 1 — MVP | ZIP ingestion, HTML→Markdown, Hugo bundle writing, image localization | 🚧 In Progress |
+| 2 — Robustness | Incremental state tracking, slug collision handling, metadata fallback, verify command | 📋 Planned |
+| 3 — Polish | Embed conversion, theme config mapping, Pandoc backend, internal link rewriting | 📋 Planned |
 
-Each stage is isolated, testable, and composable.
+---
 
-The goal is correctness first, cleverness later.
+## Contributing
 
-### Contributing
+Contributions are welcome! To get started:
 
-- Fork the repo
-- Create a feature branch
-- Make your changes
-- Run tests: `uv run pytest`
-- Open a pull request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Make your changes
+4. Run tests: `uv run pytest`
+5. Open a pull request
 
-### License
+---
 
-MIT License.
+## License
 
-### Author
+This project is licensed under the [MIT License](LICENSE).
 
-Edgar Bermudez
+---
 
-### Built to enable long-term content ownership and reproducible publishing workflows.
-
-It is not affiliated with Medium or any of its subsidiaries.
-
+> Built by [Edgar Bermudez](https://github.com/edgarbc) to enable long-term content ownership and reproducible publishing workflows.
+>
+> Not affiliated with Medium or any of its subsidiaries.
