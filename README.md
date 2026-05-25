@@ -45,6 +45,10 @@ Medium allows you to export your account data as a ZIP archive, but the raw expo
 
 This tool is designed to be **deterministic**, **reproducible**, and **CI-friendly**.
 
+### Primary objective
+
+Generate correctly formatted Markdown files from Medium posts, with images localized into each post bundle, so the output can be used as a durable personal/team knowledge base in Hugo (or other Markdown-first workflows).
+
 ---
 
 ## Features
@@ -170,9 +174,21 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 
 | Milestone | Focus | Status |
 |---|---|---|
-| 1 — MVP | ZIP ingestion, HTML→Markdown, Hugo bundle writing, image localization | ✅ Done |
-| 2 — Robustness | Incremental state tracking, metadata fallback, verify command | 📋 Planned |
-| 3 — Polish | Embed conversion, theme config mapping, Pandoc backend, internal link rewriting | 📋 Planned |
+| 1 — Core conversion | ZIP ingestion, post discovery, HTML→Markdown conversion, Hugo bundle writing, local/remote image localization, slug collision handling | ✅ Implemented |
+| 2 — Content fidelity + verification | Better metadata extraction (`date`, tags), machine-readable conversion report, `verify` command, clearer failure reporting | 📋 Planned |
+| 3 — Incremental + extensibility | Incremental state tracking, embed conversion, theme mapping, optional Pandoc backend, internal link rewriting | 📋 Planned |
+
+### Roadmap review (based on current code)
+
+- The original roadmap direction is still valid: **MVP first, then robustness, then polish**.
+- Milestone 1 is effectively complete for the current scope (single `convert` command, bundle writing, image localization, basic collision handling).
+- To maximize practical value for knowledge-base usage, Milestone 2 should prioritize metadata quality and a verification/reporting workflow before advanced conversion options.
+
+### README improvements to prioritize
+
+- Add a short “Known limitations” section (missing date/tags extraction, no embed shortcode conversion yet, no incremental mode yet).
+- Add a “How to validate output” section once `verify` is implemented.
+- Add a small real input/output example (one Medium HTML post → one generated `index.md`) to set formatting expectations quickly.
 
 ---
 
