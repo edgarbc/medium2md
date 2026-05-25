@@ -4,9 +4,9 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/medium2md-cli.svg)](https://pypi.org/project/medium2md-cli/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Convert a Medium export ZIP into clean, Hugo-ready Markdown page bundles.
+> Convert a Medium export ZIP into clean Markdown with localized images, optimized for Hugo and compatible with Obsidian knowledge bases.
 
-**medium2md** is a CLI tool that transforms Medium's HTML export into properly structured [Hugo](https://gohugo.io/) content using page bundles — enabling full ownership of your content and a clean, reproducible migration from Medium to Hugo.
+**medium2md** is a CLI tool that transforms Medium's HTML export into properly structured Markdown with localized assets. Today, output is optimized for [Hugo](https://gohugo.io/) page bundles and is also readable in [Obsidian](https://obsidian.md/) vaults; planned roadmap work adds stronger Obsidian-specific formatting conventions.
 
 ---
 
@@ -42,8 +42,13 @@ Medium allows you to export your account data as a ZIP archive, but the raw expo
 | Canonical URL | Preserves the original Medium URL |
 | Conversion reports | Summarizes what was converted and what was skipped |
 | Incremental re-runs | *(planned)* Re-run only changed posts |
+| Obsidian compatibility | Current output is Obsidian-readable; dedicated Obsidian formatting profile is planned |
 
 This tool is designed to be **deterministic**, **reproducible**, and **CI-friendly**.
+
+### Primary objective
+
+Generate correctly formatted Markdown files from Medium posts, with images localized into each post bundle, so the output can be used as a durable personal/team knowledge base in Hugo (or other Markdown-first workflows).
 
 ---
 
@@ -68,6 +73,14 @@ This tool is designed to be **deterministic**, **reproducible**, and **CI-friend
 - Verification command
 - Theme-specific front matter mapping
 - Conversion report (e.g. JSON/file)
+- Obsidian-friendly output profile (e.g., front matter + file layout conventions for vault workflows)
+
+### Known limitations (current)
+
+- Front matter currently includes `title`, `slug`, `draft`, and optional `medium.canonical`; date/tags are not extracted yet.
+- Embedded content is not converted to Hugo shortcodes yet.
+- Incremental conversion/state tracking is not implemented yet.
+- Output structure is Hugo-first (`content/posts/<slug>/index.md`); a dedicated Obsidian output mode is not implemented yet.
 
 ---
 
@@ -170,9 +183,15 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 
 | Milestone | Focus | Status |
 |---|---|---|
-| 1 — MVP | ZIP ingestion, HTML→Markdown, Hugo bundle writing, image localization | ✅ Done |
-| 2 — Robustness | Incremental state tracking, metadata fallback, verify command | 📋 Planned |
-| 3 — Polish | Embed conversion, theme config mapping, Pandoc backend, internal link rewriting | 📋 Planned |
+| 1 — Core conversion | ZIP ingestion, post discovery, HTML→Markdown conversion, Hugo bundle writing, local/remote image localization, slug collision handling | ✅ Implemented |
+| 2 — Content fidelity + verification | Better metadata extraction (`date`, tags), machine-readable conversion report, `verify` command, clearer failure reporting, Obsidian formatting compatibility review | 📋 Planned |
+| 3 — Incremental + extensibility | Incremental state tracking, embed conversion, output-profile mapping (Hugo/Obsidian), optional Pandoc backend, internal link rewriting | 📋 Planned |
+
+### Roadmap status snapshot (code-verified)
+
+- The repository has implemented the core `convert` flow end-to-end.
+- Milestone 2 is the highest-impact next step for knowledge-base quality (`date`/tags extraction, verification/reporting, Obsidian compatibility conventions).
+- Milestone 3 remains optional/polish after fidelity and verification are stable.
 
 ---
 
