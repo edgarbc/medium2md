@@ -73,6 +73,12 @@ Generate correctly formatted Markdown files from Medium posts, with images local
 - Theme-specific front matter mapping
 - Conversion report (e.g. JSON/file)
 
+### Known limitations (current)
+
+- Front matter currently includes `title`, `slug`, `draft`, and optional `medium.canonical`; date/tags are not extracted yet.
+- Embedded content is not converted to Hugo shortcodes yet.
+- Incremental conversion/state tracking is not implemented yet.
+
 ---
 
 ## Installation
@@ -178,17 +184,11 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 | 2 — Content fidelity + verification | Better metadata extraction (`date`, tags), machine-readable conversion report, `verify` command, clearer failure reporting | 📋 Planned |
 | 3 — Incremental + extensibility | Incremental state tracking, embed conversion, theme mapping, optional Pandoc backend, internal link rewriting | 📋 Planned |
 
-### Roadmap review (based on current code)
+### Roadmap status snapshot (code-verified)
 
-- The original roadmap direction is still valid: **MVP first, then robustness, then polish**.
-- Milestone 1 is effectively complete for the current scope (single `convert` command, bundle writing, image localization, basic collision handling).
-- To maximize practical value for knowledge-base usage, Milestone 2 should prioritize metadata quality and a verification/reporting workflow before advanced conversion options.
-
-### README improvements to prioritize
-
-- Add a short “Known limitations” section (missing date/tags extraction, no embed shortcode conversion yet, no incremental mode yet).
-- Add a “How to validate output” section once `verify` is implemented.
-- Add a small real input/output example (one Medium HTML post → one generated `index.md`) to set formatting expectations quickly.
+- The repository has implemented the core `convert` flow end-to-end.
+- Milestone 2 is the highest-impact next step for knowledge-base quality (`date`/tags extraction, verification/reporting).
+- Milestone 3 remains optional/polish after fidelity and verification are stable.
 
 ---
 
