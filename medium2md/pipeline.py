@@ -2,6 +2,7 @@
 
 import shutil
 import time
+from enum import Enum
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -9,6 +10,13 @@ import yaml
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 from slugify import slugify
+
+
+class OutputFormat(str, Enum):
+    """Supported output formats for converted Markdown files."""
+
+    hugo = "hugo"
+    obsidian = "obsidian"
 
 try:
     import httpx
@@ -107,10 +115,10 @@ def _localize_images(
     article_soup: BeautifulSoup,
     html_path: Path,
     tmp_dir: Path,
-    bundle_dir: Path,
+    images_dir: Path,
+    src_prefix: str,
 ) -> int:
-    """In-place: resolve each img src to a local file or download, copy into bundle/images/, set src to images/<name>. Returns count of images localized."""
-    images_dir = bundle_dir / "images"
+    """In-place: resolve each img src to a local file or download, copy into images_dir, set src to src_prefix<name>. Returns count of images localized."""
     images_dir.mkdir(parents=True, exist_ok=True)
     imgs = article_soup.find_all("img", src=True)
     localized = 0
@@ -131,7 +139,7 @@ def _localize_images(
             dest_name = f"{i}{ext}"
             dest = images_dir / dest_name
             shutil.copy2(resolved, dest)
-            img["src"] = f"images/{dest_name}"
+            img["src"] = f"{src_prefix}{dest_name}"
             localized += 1
             continue
         # Remote URL: download (with User-Agent and retry so CDNs don't block)
@@ -154,7 +162,7 @@ def _localize_images(
                 dest_name = f"{i}{ext}"
                 dest = images_dir / dest_name
                 dest.write_bytes(r.content)
-                img["src"] = f"images/{dest_name}"
+                img["src"] = f"{src_prefix}{dest_name}"
                 localized += 1
                 last_error = None
                 break
@@ -172,8 +180,14 @@ def convert_html_file(
     html_path: Path,
     tmp_dir: Path,
     bundle_dir: Path,
+    *,
+    images_dir: Path | None = None,
+    src_prefix: str = "images/",
 ) -> tuple[str, str | None, str, int]:
-    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, markdown_body, num_images_localized)."""
+    """Parse one post HTML file, localize images, return (title, canonical_url, markdown_body, num_images_localized).
+
+    Images are saved into *images_dir* (defaults to bundle_dir/images) and referenced with *src_prefix* in the Markdown.
+    """
     raw = html_path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "lxml")
     title = _extract_title(soup)
@@ -183,8 +197,9 @@ def convert_html_file(
         body_md = ""
         localized = 0
     else:
+        resolved_images_dir = images_dir if images_dir is not None else bundle_dir / "images"
         article_soup = BeautifulSoup(article_html, "lxml")
-        localized = _localize_images(article_soup, html_path, tmp_dir, bundle_dir)
+        localized = _localize_images(article_soup, html_path, tmp_dir, resolved_images_dir, src_prefix)
         body_md = md(
             str(article_soup),
             heading_style="ATX",
@@ -211,7 +226,7 @@ def write_bundle(out_root: Path, slug: str, title: str, canonical: str | None, b
     """Write one Hugo page bundle: out_root/<slug>/index.md. Returns path to index.md."""
     bundle_dir = out_root / slug
     bundle_dir.mkdir(parents=True, exist_ok=True)
-    front = {
+    front: dict = {
         "title": title,
         "draft": True,
         "slug": slug,
@@ -227,3 +242,24 @@ def write_bundle(out_root: Path, slug: str, title: str, canonical: str | None, b
         if body_md and not body_md.endswith("\n"):
             f.write("\n")
     return index_md
+
+
+def write_note(out_root: Path, slug: str, title: str, canonical: str | None, body_md: str) -> Path:
+    """Write one Obsidian note: out_root/<slug>.md. Returns path to the note.
+
+    Front matter uses Obsidian conventions: ``title`` and ``source`` (canonical URL).
+    Images are expected to reside in ``out_root/assets/<slug>/`` and are referenced
+    as ``assets/<slug>/<name>`` in the Markdown body.
+    """
+    front: dict = {"title": title}
+    if canonical:
+        front["source"] = canonical
+    note_path = out_root / f"{slug}.md"
+    with note_path.open("w", encoding="utf-8") as f:
+        f.write("---\n")
+        f.write(yaml.dump(front, default_flow_style=False, allow_unicode=True, sort_keys=False))
+        f.write("---\n\n")
+        f.write(body_md)
+        if body_md and not body_md.endswith("\n"):
+            f.write("\n")
+    return note_path

@@ -4,20 +4,29 @@ import tempfile
 import typer
 
 from medium2md.pipeline import (
+    OutputFormat,
     find_post_html_files,
     get_title_canonical,
     convert_html_file,
     slug_from_post,
     write_bundle,
+    write_note,
 )
 
-app = typer.Typer(help="Convert a Medium export ZIP into Hugo page bundles.")
+app = typer.Typer(help="Convert a Medium export ZIP into Hugo page bundles or Obsidian notes.")
 
 
 @app.command()
 def convert(
     export_zip: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=False),
     out: Path = typer.Option(Path("content/posts"), "--out", "-o"),
+    fmt: OutputFormat = typer.Option(
+        OutputFormat.hugo,
+        "--format",
+        "-f",
+        help="Output format: 'hugo' (default) produces Hugo page bundles; 'obsidian' produces flat Markdown notes.",
+        show_default=True,
+    ),
 ):
     out = out.resolve()
     if not out.exists():
@@ -34,6 +43,7 @@ def convert(
 
     typer.echo(f"Export: {export_zip}")
     typer.echo(f"Out:    {out}")
+    typer.echo(f"Format: {fmt.value}")
 
     with tempfile.TemporaryDirectory(prefix="medium2md_") as td:
         tmp_dir = Path(td)
@@ -72,13 +82,29 @@ def convert(
                     suffix = 2 if slug == base_slug else int(slug.split("-")[-1]) + 1
                     slug = f"{base_slug}-{suffix}"
                 used_slugs.add(slug)
-                bundle_dir = out / slug
-                bundle_dir.mkdir(parents=True, exist_ok=True)
-                title, canonical, body_md, num_images = convert_html_file(html_path, tmp_dir, bundle_dir)
-                write_bundle(out, slug, title, canonical, body_md)
+
+                if fmt == OutputFormat.hugo:
+                    bundle_dir = out / slug
+                    bundle_dir.mkdir(parents=True, exist_ok=True)
+                    title, canonical, body_md, num_images = convert_html_file(html_path, tmp_dir, bundle_dir)
+                    write_bundle(out, slug, title, canonical, body_md)
+                    output_path = out / slug / "index.md"
+                else:
+                    # Obsidian: flat note + shared assets folder
+                    assets_dir = out / "assets" / slug
+                    title, canonical, body_md, num_images = convert_html_file(
+                        html_path,
+                        tmp_dir,
+                        out,
+                        images_dir=assets_dir,
+                        src_prefix=f"assets/{slug}/",
+                    )
+                    write_note(out, slug, title, canonical, body_md)
+                    output_path = out / f"{slug}.md"
+
                 written += 1
                 img_info = f" ({num_images} image(s))" if num_images else ""
-                typer.echo(f"  [{i}/{len(post_files)}] {slug}  →  {out / slug / 'index.md'}{img_info}")
+                typer.echo(f"  [{i}/{len(post_files)}] {slug}  →  {output_path}{img_info}")
             except Exception as e:
                 errors += 1
                 typer.echo(
