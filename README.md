@@ -86,7 +86,21 @@ Generate correctly formatted Markdown files from Medium posts, with images local
 
 ## Installation
 
-This project uses [uv](https://github.com/astral-sh/uv) for dependency management.
+### Install the CLI
+
+Install **medium2md** once, then run `medium2md` from any directory:
+
+```bash
+pip install medium2md-cli
+# or
+uv tool install medium2md-cli
+```
+
+After installation, the CLI command is simply `medium2md`.
+
+### Development checkout
+
+If you're contributing to this repository, use [uv](https://github.com/astral-sh/uv) to create the project environment:
 
 ```bash
 git clone https://github.com/edgarbc/medium2md.git
@@ -94,28 +108,37 @@ cd medium2md
 uv sync
 ```
 
-Once published to PyPI, install with:
-
-```bash
-pip install medium2md-cli
-# or with uv:
-uv tool install medium2md-cli
-```
-
-The CLI command is still `medium2md`.
-
 ---
 
 ## Usage
 
-Copy your Medium export ZIP into the `input/` directory (already set up and git-ignored):
+Run `medium2md` from wherever you keep your Medium export ZIP. For example, from your home directory:
 
 ```bash
-cp ~/Downloads/medium-export.zip input/
-uv run medium2md input/medium-export.zip --out ../blog/content/posts
+cd ~
+medium2md ~/Downloads/medium-export.zip --out ~/blog/content/posts
 ```
 
-> **Note:** The `input/` directory is tracked by git (via `.gitkeep`) so it exists after a fresh clone, but its contents are ignored — your ZIP files will never be accidentally committed.
+If you prefer not to install the CLI first, you can also run it directly with `uvx`:
+
+```bash
+uvx medium2md-cli ~/Downloads/medium-export.zip --out ~/blog/content/posts
+```
+
+> **Note:** The export ZIP can live anywhere on your machine. It does **not** need to be copied into this repository.
+
+### Example CLI run
+
+Verified example from `~` using a demo Medium export ZIP:
+
+```bash
+cd ~
+medium2md ~/Downloads/medium-export-demo.zip --out ~/demo-blog/content/posts
+```
+
+![CLI screenshot showing medium2md converting a demo Medium export ZIP from the home directory](docs/images/cli-example.png)
+
+If you're developing inside this repository, the git-ignored `input/` directory is still available as an optional scratch location for local ZIP files.
 
 ### Front Matter Example
 
@@ -155,6 +178,9 @@ content/posts/
 
 ```
 medium2md/
+├── docs/
+│   └── images/
+│       └── cli-example.png
 ├── medium2md/
 │   ├── __init__.py
 │   ├── cli.py
@@ -164,7 +190,7 @@ medium2md/
 ├── README.md
 ├── project-plan.md
 └── input/
-    └── medium-export.zip
+    └── .gitkeep
 ```
 
 ### Pipeline Architecture
