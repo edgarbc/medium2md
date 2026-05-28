@@ -212,8 +212,8 @@ def test_convert_html_file_obsidian_custom_images_dir(tmp_path):
 
 def test_find_post_html_files_with_posts_dir(tmp_path):
     (tmp_path / "posts").mkdir()
-    (tmp_path / "posts" / "a.html").write_text("<html/>")
-    (tmp_path / "posts" / "b.html").write_text("<html/>")
+    (tmp_path / "posts" / "a.html").write_text("<html/>", encoding="utf-8")
+    (tmp_path / "posts" / "b.html").write_text("<html/>", encoding="utf-8")
     (tmp_path / "blocks").mkdir()
     (tmp_path / "blocks" / "x.html").write_text("<html/>", encoding="utf-8")  # should be ignored
     result = find_post_html_files(tmp_path)
