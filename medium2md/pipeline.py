@@ -119,8 +119,10 @@ def _localize_images(
     src_prefix: str,
 ) -> int:
     """In-place: resolve each img src to a local file or download, copy into images_dir, set src to src_prefix<name>. Returns count of images localized."""
-    images_dir.mkdir(parents=True, exist_ok=True)
     imgs = article_soup.find_all("img", src=True)
+    if not imgs:
+        return 0
+    images_dir.mkdir(parents=True, exist_ok=True)
     localized = 0
     for i, img in enumerate(imgs, 1):
         src = img["src"].strip()
