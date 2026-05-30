@@ -225,9 +225,9 @@ def test_find_post_html_files_with_posts_dir(tmp_path):
 def test_find_post_html_files_excludes_non_post_dirs(tmp_path):
     for d in ("blocks", "bookmarks", "claps"):
         (tmp_path / d).mkdir()
-        (tmp_path / d / "x.html").write_text("<html/>")
-    (tmp_path / "README.html").write_text("<html/>")
-    (tmp_path / "my-post.html").write_text("<html/>")
+        (tmp_path / d / "x.html").write_text("<html/>", encoding="utf-8")
+    (tmp_path / "README.html").write_text("<html/>", encoding="utf-8")
+    (tmp_path / "my-post.html").write_text("<html/>", encoding="utf-8")
     result = find_post_html_files(tmp_path)
     names = [p.name for p in result]
     assert "my-post.html" in names
