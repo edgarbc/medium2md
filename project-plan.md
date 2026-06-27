@@ -409,19 +409,48 @@ Hugo builds site on GitHub Pages / Netlify / Cloudflare Pages
 - [ ] Basic image download + rewrite
 - [ ] Generate report
 
-### Milestone 2 (robustness)
+### Milestone 2 (content fidelity + verification)
 
-- [ ] Incremental state
-- [ ] Slug collision handling
-- [ ] Better metadata extraction fallback paths
+- [x] Filter out comment/reply stubs — DONE (2026-06-26). `pipeline.inspect_post()` counts only `<section data-field="body">` words (excludes title header + `<footer>` boilerplate); `pipeline.classify_stub()` flags a stub when words < `--min-words` (default 100) OR a reply-style title (thanks/thank you/hi/hey/hello/totally/great post/…) under 250 words. CLI reports each skip + a summary; `--min-words 0` disables. Verified on the real export: 133 → 117 written + 16 filtered, no false positives. Post-discovery step → benefits both targets. (Did NOT gate on canonical: this export has no `<link rel=canonical>`.)
+- [ ] Better metadata extraction fallback paths — parse the body footer (`By … on <date>`) for the publish date and the `[Canonical link](…)` anchor for canonical, since this export has neither in `<head>`. Extract tags into front matter.
+- [ ] Fix `_extract_canonical` to fall back to the body footer anchor (currently only checks `<link rel=canonical>`, so canonical is empty for every post in this export).
+- [ ] Machine-readable conversion report (`medium2md-report.json`) — include skipped stubs, missing metadata, download failures.
 - [ ] verify command
+- [ ] Clearer failure reporting
 
-### Milestone 3 (polish)
+NOTE (test run 2026-06-26): export has no `<link rel=canonical>` and no `<head>` date; the real canonical + publish date live only in the body footer (`By <author> on <date>` · `[Canonical link](url)` · `Exported from Medium on <date>`). The footer is ~20 words of boilerplate the stub word-count must strip before thresholding.
 
+### Milestone 3 (Obsidian output mode)
+
+Emit Obsidian-flavored Markdown notes per post as a co-equal output target to Hugo, selectable via `--target hugo|obsidian`. Builds on M2's richer metadata; consolidates the Obsidian work previously implied by "output-profile mapping".
+
+**Decided conventions (2026-06-26, from a real test run):**
+
+- **Note files:** one `<Title>.md` per post, flat into `--out` (no per-post folder / no `index.md`). Filename = title sanitized of filesystem-illegal AND Obsidian-reserved chars (`/ \ : * ? " < > | # ^ [ ]`); title collisions → numeric suffix or slug fallback.
+- **Attachments:** single shared folder at `--out` root (default `_attachments/`, via `--attachments-dir`). `![[name]]` resolves by filename vault-wide, so image names must be globally unique → `<slug>-<n>-<shorthash>.<ext>` (mandatory; current per-folder `<n>.<ext>` collides once flattened).
+- **Image links:** Obsidian embed `![[<filename>]]` (not standard markdown).
+- **Figcaptions:** Medium `<figcaption>` → italic caption line under the embed (currently dropped to a loose paragraph).
+- **Front matter:** `title`, `tags` (list), `created`/`date`, `source` (canonical), optional `aliases`; NO `draft`/`slug` keys.
+- **Wikilinks:** rewrite links between converted posts to `[[Note Title]]`.
+
+Tasks:
+
+- [ ] Output-profile abstraction: factor the write step into a profile interface (Hugo bundle / Obsidian note share parse+convert+localize, differ in layout + front matter + image emission)
+- [ ] `--target hugo|obsidian` flag (default hugo); `--attachments-dir` (default `_attachments`)
+- [ ] Title → filename sanitizer + collision handling (flat into `--out`)
+- [ ] Collision-safe image naming `<slug>-<n>-<shorthash>.<ext>` into the shared attachments folder
+- [ ] `![[...]]` embed emission for localized images
+- [ ] Figcaption → italic caption / embed alt text
+- [ ] Obsidian front matter (`title`/`tags`/`created`/`source`/`aliases`; no `draft`/`slug`)
+- [ ] `[[wikilink]]` rewriting between converted posts
+
+### Milestone 4 (incremental + extensibility / polish)
+
+- [ ] Incremental state (`.medium2md/state.json`, content-hash skip)
 - [ ] Better embed conversions (YouTube/Twitter/Gist)
-- [ ] Theme mapping config
+- [ ] Theme mapping config / config file support
 - [ ] Optional pandoc backend
-- [ ] Link rewriting among your posts (optional)
+- [ ] Link rewriting among your posts — Hugo target (Obsidian wikilinks handled in M3)
 
 ## Concrete “first sprint” checklist (what to implement first)
 

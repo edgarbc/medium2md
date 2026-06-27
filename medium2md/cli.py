@@ -5,7 +5,8 @@ import typer
 
 from medium2md.pipeline import (
     find_post_html_files,
-    get_title_canonical,
+    inspect_post,
+    classify_stub,
     convert_html_file,
     slug_from_post,
     write_bundle,
@@ -18,6 +19,14 @@ app = typer.Typer(help="Convert a Medium export ZIP into Hugo page bundles.")
 def convert(
     export_zip: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=False),
     out: Path = typer.Option(Path("content/posts"), "--out", "-o"),
+    min_words: int = typer.Option(
+        100,
+        "--min-words",
+        help=(
+            "Skip posts whose body has fewer than this many words. Medium exports your "
+            "comments/replies as posts; this filters out those stubs. Use 0 to include everything."
+        ),
+    ),
 ):
     out = out.resolve()
     if not out.exists():
@@ -60,11 +69,22 @@ def convert(
         used_slugs: set[str] = set()
         written = 0
         errors = 0
+        skipped: list[tuple[str, int]] = []  # (title, word_count) for filtered stubs
 
         for i, html_path in enumerate(post_files, 1):
             rel = html_path.relative_to(tmp_dir)
             try:
-                title, canonical = get_title_canonical(html_path)
+                title, canonical, words = inspect_post(html_path)
+                stub_reason = classify_stub(title, words, min_words)
+                if stub_reason is not None:
+                    skipped.append((title, words))
+                    typer.echo(
+                        typer.style(
+                            f"  [{i}/{len(post_files)}] skipped stub ({stub_reason}): {title}",
+                            fg="yellow",
+                        )
+                    )
+                    continue
                 slug = slug_from_post(title, canonical)
                 base_slug = slug
                 while slug in used_slugs:
@@ -89,6 +109,14 @@ def convert(
         typer.echo("")
         if written:
             typer.echo(typer.style(f"Done. {written} post(s) written to {out}", fg="green"))
+        if skipped:
+            typer.echo(
+                typer.style(
+                    f"Skipped {len(skipped)} comment/reply stub(s) under {min_words} words "
+                    f"(use --min-words 0 to include them).",
+                    fg="yellow",
+                )
+            )
         if errors:
             typer.echo(typer.style(f"Failed: {errors} post(s) could not be converted.", fg="red"), err=True)
         if written == 0:

@@ -1,5 +1,6 @@
 """Minimal conversion pipeline: find post HTML, parse, convert to Markdown, write Hugo bundles."""
 
+import re
 import shutil
 import time
 from pathlib import Path
@@ -79,6 +80,76 @@ def get_title_canonical(html_path: Path) -> tuple[str, str | None]:
     raw = html_path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "lxml")
     return _extract_title(soup), _extract_canonical(soup)
+
+
+def _body_section(soup: BeautifulSoup):
+    """The post body element, excluding title header and export footer.
+
+    Medium's export puts the post body in <section data-field="body" class="e-content">
+    and the author/date/canonical/"Exported from Medium" boilerplate in a separate
+    sibling <footer>. So this section is the real content, minus the title (which lives
+    in <header>) and minus the footer boilerplate.
+    """
+    return soup.find("section", attrs={"data-field": "body"})
+
+
+def _body_word_count(soup: BeautifulSoup) -> int:
+    """Word count of the post body, excluding title header and export footer."""
+    body = _body_section(soup)
+    if body is not None:
+        text = body.get_text(" ", strip=True)
+    else:
+        # Fallback: article (or body) text with any <footer> removed.
+        container = soup.find("article") or soup.find("body")
+        if container is None:
+            return 0
+        container = BeautifulSoup(str(container), "lxml")
+        for f in container.find_all("footer"):
+            f.decompose()
+        text = container.get_text(" ", strip=True)
+    return len(text.split())
+
+
+def inspect_post(html_path: Path) -> tuple[str, str | None, int]:
+    """Light parse for discovery/filtering: (title, canonical_url, body_word_count).
+
+    body_word_count counts only the post body, so Medium's comment/reply stubs
+    (exported as posts) score very low and can be filtered out before conversion.
+    """
+    raw = html_path.read_text(encoding="utf-8", errors="replace")
+    soup = BeautifulSoup(raw, "lxml")
+    return _extract_title(soup), _extract_canonical(soup), _body_word_count(soup)
+
+
+# High-confidence conversational openers for Medium responses (comments/replies).
+# Anchored at the title start; only used together with a word ceiling so a real
+# post can't be filtered on the title alone.
+_REPLY_TITLE_RE = re.compile(
+    r"^\s*(thanks\b|thank you\b|thx\b|hi\b|hey\b|hello\b|totally\b|agreed\b|"
+    r"congrats\b|congratulations\b|well said\b|good point\b|"
+    r"nice (post|article|one|work)\b|great (post|article|read|work)\b)",
+    re.IGNORECASE,
+)
+
+# A reply-style title above this many words is treated as a real post, not a stub.
+REPLY_MAX_WORDS = 250
+
+
+def classify_stub(title: str, words: int, min_words: int) -> str | None:
+    """Return a short reason if this post looks like a comment/reply stub, else None.
+
+    Two signals, both overridable via min_words=0 (filtering off):
+      1. Body shorter than min_words.
+      2. A conversational reply-style title on a short-ish post (< REPLY_MAX_WORDS).
+    Medium exports your responses/comments as posts; this separates them from real posts.
+    """
+    if min_words <= 0:
+        return None
+    if words < min_words:
+        return f"{words}w < {min_words}"
+    if words < REPLY_MAX_WORDS and _REPLY_TITLE_RE.match(title or ""):
+        return f"reply-style title ({words}w)"
+    return None
 
 
 # Extension from URL path or Content-Type
