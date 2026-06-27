@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import yaml
 from bs4 import BeautifulSoup
+from dateutil import parser as dateparser
 from markdownify import markdownify as md
 from slugify import slugify
 
@@ -48,7 +49,36 @@ def find_post_html_files(root: Path) -> list[Path]:
 
 def _extract_canonical(soup: BeautifulSoup) -> str | None:
     link = soup.find("link", rel="canonical", href=True)
-    return link["href"].strip() if link else None
+    if link:
+        return link["href"].strip()
+    # Medium's export has no <link rel="canonical">; the canonical URL lives in the
+    # footer as <a class="p-canonical">Canonical link</a>.
+    a = soup.find("a", class_="p-canonical", href=True)
+    return a["href"].strip() if a else None
+
+
+def _extract_date(soup: BeautifulSoup) -> str | None:
+    """Publish date as an RFC 3339 string, from the Medium export footer.
+
+    Medium puts it in <time class="dt-published" datetime="2025-10-02T11:15:52.897Z">;
+    there is no date in <head>. Falls back to parsing the human-readable text.
+    """
+    t = soup.find("time", class_="dt-published")
+    if t is None:
+        return None
+    iso = t.get("datetime")
+    if iso:
+        try:
+            return dateparser.isoparse(iso.strip()).replace(microsecond=0).isoformat()
+        except (ValueError, OverflowError):
+            pass
+    text = t.get_text(strip=True)
+    if text:
+        try:
+            return dateparser.parse(text).date().isoformat()
+        except (ValueError, OverflowError):
+            pass
+    return None
 
 
 def _extract_title(soup: BeautifulSoup) -> str:
@@ -243,18 +273,23 @@ def convert_html_file(
     html_path: Path,
     tmp_dir: Path,
     bundle_dir: Path,
-) -> tuple[str, str | None, str, int]:
-    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, markdown_body, num_images_localized)."""
+) -> tuple[str, str | None, str | None, str, int]:
+    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, date, markdown_body, num_images_localized)."""
     raw = html_path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "lxml")
     title = _extract_title(soup)
     canonical = _extract_canonical(soup)
+    date = _extract_date(soup)
     article_html = _extract_article_html(soup)
     if not article_html:
         body_md = ""
         localized = 0
     else:
         article_soup = BeautifulSoup(article_html, "lxml")
+        # Drop the Medium export footer (author/date/canonical/"Exported from Medium");
+        # that metadata now lives in the front matter, so it would be redundant in the body.
+        for footer in article_soup.find_all("footer"):
+            footer.decompose()
         localized = _localize_images(article_soup, html_path, tmp_dir, bundle_dir)
         body_md = md(
             str(article_soup),
@@ -263,14 +298,16 @@ def convert_html_file(
             escape_asterisks=False,
             escape_underscores=False,
         )
-    return title, canonical, (body_md or "").strip(), localized
+    return title, canonical, date, (body_md or "").strip(), localized
 
 
 def slug_from_post(title: str, canonical: str | None) -> str:
     """Generate a Hugo-friendly slug."""
     if canonical and "/" in canonical:
-        # e.g. https://medium.com/@user/some-post-slug-123
+        # e.g. https://medium.com/@user/some-post-slug-41ad5d2bc569
         part = canonical.rstrip("/").split("/")[-1]
+        # Drop Medium's trailing post-id hash so the slug stays clean.
+        part = _MEDIUM_ID_RE.sub("", part)
         if part and part != "medium.com":
             s = slugify(part, max_length=80)
             if s:
@@ -278,15 +315,26 @@ def slug_from_post(title: str, canonical: str | None) -> str:
     return slugify(title, max_length=80) or "untitled"
 
 
-def write_bundle(out_root: Path, slug: str, title: str, canonical: str | None, body_md: str) -> Path:
+# Trailing Medium post-id hash on a canonical slug, e.g. "-41ad5d2bc569".
+_MEDIUM_ID_RE = re.compile(r"-[0-9a-f]{8,}$")
+
+
+def write_bundle(
+    out_root: Path,
+    slug: str,
+    title: str,
+    canonical: str | None,
+    body_md: str,
+    date: str | None = None,
+) -> Path:
     """Write one Hugo page bundle: out_root/<slug>/index.md. Returns path to index.md."""
     bundle_dir = out_root / slug
     bundle_dir.mkdir(parents=True, exist_ok=True)
-    front = {
-        "title": title,
-        "draft": True,
-        "slug": slug,
-    }
+    front: dict = {"title": title}
+    if date:
+        front["date"] = date
+    front["draft"] = True
+    front["slug"] = slug
     if canonical:
         front["medium"] = {"canonical": canonical}
     index_md = bundle_dir / "index.md"

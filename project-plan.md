@@ -412,8 +412,7 @@ Hugo builds site on GitHub Pages / Netlify / Cloudflare Pages
 ### Milestone 2 (content fidelity + verification)
 
 - [x] Filter out comment/reply stubs — DONE (2026-06-26). `pipeline.inspect_post()` counts only `<section data-field="body">` words (excludes title header + `<footer>` boilerplate); `pipeline.classify_stub()` flags a stub when words < `--min-words` (default 100) OR a reply-style title (thanks/thank you/hi/hey/hello/totally/great post/…) under 250 words. CLI reports each skip + a summary; `--min-words 0` disables. Verified on the real export: 133 → 117 written + 16 filtered, no false positives. Post-discovery step → benefits both targets. (Did NOT gate on canonical: this export has no `<link rel=canonical>`.)
-- [ ] Better metadata extraction fallback paths — parse the body footer (`By … on <date>`) for the publish date and the `[Canonical link](…)` anchor for canonical, since this export has neither in `<head>`. Extract tags into front matter.
-- [ ] Fix `_extract_canonical` to fall back to the body footer anchor (currently only checks `<link rel=canonical>`, so canonical is empty for every post in this export).
+- [x] Better metadata extraction — DONE (2026-06-26). `_extract_date()` reads footer `<time class=dt-published datetime=…>` → RFC3339 (`date:` in front matter). `_extract_canonical()` falls back to footer `<a class=p-canonical>`. Slug strips Medium's trailing post-id hash (`_MEDIUM_ID_RE`). Export footer removed from the converted body (data now in front matter). 130/133 get canonical+date; 3 misses are `draft_*` (graceful omit). Tags still pending (export HTML has none in the body).
 - [ ] Machine-readable conversion report (`medium2md-report.json`) — include skipped stubs, missing metadata, download failures.
 - [ ] verify command
 - [ ] Clearer failure reporting
