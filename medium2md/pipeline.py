@@ -1,9 +1,10 @@
 """Minimal conversion pipeline: find post HTML, parse, convert to Markdown, write Hugo bundles."""
 
+import hashlib
 import re
-import shutil
 import time
 from pathlib import Path
+from typing import Callable
 from urllib.parse import urlparse
 
 import yaml
@@ -11,6 +12,10 @@ from bs4 import BeautifulSoup
 from dateutil import parser as dateparser
 from markdownify import markdownify as md
 from slugify import slugify
+
+# Image-handling hooks that differ per output target.
+ImageNamer = Callable[[int, str, bytes], str]  # (index, ext, content) -> filename
+ImageSrcer = Callable[[str], str]  # (filename) -> value written into <img src>
 
 try:
     import httpx
@@ -208,10 +213,17 @@ def _localize_images(
     article_soup: BeautifulSoup,
     html_path: Path,
     tmp_dir: Path,
-    bundle_dir: Path,
+    images_dir: Path,
+    image_namer: "ImageNamer",
+    image_srcer: "ImageSrcer",
 ) -> int:
-    """In-place: resolve each img src to a local file or download, copy into bundle/images/, set src to images/<name>. Returns count of images localized."""
-    images_dir = bundle_dir / "images"
+    """In-place: resolve each <img> to a local file or download it into images_dir.
+
+    image_namer(index, ext, content) chooses the saved filename; image_srcer(name)
+    chooses what to write back into the <img src> (a bundle-relative path for Hugo,
+    a bare filename for Obsidian). Returns the count of images localized. Images that
+    can't be resolved/downloaded keep their original src (so the URL survives in the MD).
+    """
     images_dir.mkdir(parents=True, exist_ok=True)
     imgs = article_soup.find_all("img", src=True)
     localized = 0
@@ -228,11 +240,11 @@ def _localize_images(
                 continue  # outside export, skip
             if not resolved.is_file():
                 continue
+            content = resolved.read_bytes()
             ext = resolved.suffix.lower() or ".png"
-            dest_name = f"{i}{ext}"
-            dest = images_dir / dest_name
-            shutil.copy2(resolved, dest)
-            img["src"] = f"images/{dest_name}"
+            dest_name = image_namer(i, ext, content)
+            (images_dir / dest_name).write_bytes(content)
+            img["src"] = image_srcer(dest_name)
             localized += 1
             continue
         # Remote URL: download (with User-Agent and retry so CDNs don't block)
@@ -252,10 +264,9 @@ def _localize_images(
                     raise ValueError("empty response")
                 ct = r.headers.get("content-type", "")
                 ext = _extension_for_url(src, ct)
-                dest_name = f"{i}{ext}"
-                dest = images_dir / dest_name
-                dest.write_bytes(r.content)
-                img["src"] = f"images/{dest_name}"
+                dest_name = image_namer(i, ext, r.content)
+                (images_dir / dest_name).write_bytes(r.content)
+                img["src"] = image_srcer(dest_name)
                 localized += 1
                 last_error = None
                 break
@@ -269,12 +280,26 @@ def _localize_images(
     return localized
 
 
+def _hugo_image_namer(index: int, ext: str, content: bytes) -> str:
+    return f"{index}{ext}"
+
+
+def _hugo_image_srcer(name: str) -> str:
+    return f"images/{name}"
+
+
 def convert_html_file(
     html_path: Path,
     tmp_dir: Path,
-    bundle_dir: Path,
+    images_dir: Path,
+    image_namer: "ImageNamer" = _hugo_image_namer,
+    image_srcer: "ImageSrcer" = _hugo_image_srcer,
 ) -> tuple[str, str | None, str | None, str, int]:
-    """Parse one post HTML file, localize images into bundle_dir/images/, return (title, canonical_url, date, markdown_body, num_images_localized)."""
+    """Parse one post HTML file, localize images into images_dir, return (title, canonical_url, date, markdown_body, num_images_localized).
+
+    image_namer/image_srcer control how images are named and referenced; they default to
+    the Hugo scheme (images/<n>.<ext>). Pass Obsidian variants for the Obsidian target.
+    """
     raw = html_path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "lxml")
     title = _extract_title(soup)
@@ -290,7 +315,16 @@ def convert_html_file(
         # that metadata now lives in the front matter, so it would be redundant in the body.
         for footer in article_soup.find_all("footer"):
             footer.decompose()
-        localized = _localize_images(article_soup, html_path, tmp_dir, bundle_dir)
+        # Render figure captions in italics (they become a plain paragraph otherwise).
+        for fc in article_soup.find_all("figcaption"):
+            if fc.get_text(strip=True):
+                em = article_soup.new_tag("em")
+                for child in list(fc.contents):
+                    em.append(child.extract())
+                fc.append(em)
+        localized = _localize_images(
+            article_soup, html_path, tmp_dir, images_dir, image_namer, image_srcer
+        )
         body_md = md(
             str(article_soup),
             heading_style="ATX",
@@ -319,6 +353,15 @@ def slug_from_post(title: str, canonical: str | None) -> str:
 _MEDIUM_ID_RE = re.compile(r"-[0-9a-f]{8,}$")
 
 
+def _render_note(front: dict, body_md: str) -> str:
+    """YAML front matter + body, as a single Markdown string."""
+    fm = yaml.dump(front, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    out = f"---\n{fm}---\n\n{body_md}"
+    if body_md and not body_md.endswith("\n"):
+        out += "\n"
+    return out
+
+
 def write_bundle(
     out_root: Path,
     slug: str,
@@ -338,11 +381,92 @@ def write_bundle(
     if canonical:
         front["medium"] = {"canonical": canonical}
     index_md = bundle_dir / "index.md"
-    with index_md.open("w", encoding="utf-8") as f:
-        f.write("---\n")
-        f.write(yaml.dump(front, default_flow_style=False, allow_unicode=True, sort_keys=False))
-        f.write("---\n\n")
-        f.write(body_md)
-        if body_md and not body_md.endswith("\n"):
-            f.write("\n")
+    index_md.write_text(_render_note(front, body_md), encoding="utf-8")
     return index_md
+
+
+# ---------------------------------------------------------------------------
+# Obsidian output target
+# ---------------------------------------------------------------------------
+
+DEFAULT_ATTACHMENTS_DIR = "_attachments"
+
+# Characters illegal in filenames (filesystem) or special to Obsidian (#, ^, [, ]).
+_ILLEGAL_FILENAME_RE = re.compile(r'[\\/:*?"<>|#^\[\]]+')
+
+# A bare local image filename in Markdown image syntax: ![alt](name.ext) with no
+# slashes or scheme (so remote/failed-download URLs are left as standard Markdown).
+_BARE_IMAGE_MD_RE = re.compile(r"!\[[^\]]*\]\(([^()\s/]+\.[A-Za-z0-9]+)\)")
+
+
+def sanitize_note_filename(title: str) -> str:
+    """Turn a post title into a safe, human-readable Obsidian note filename (no extension)."""
+    name = _ILLEGAL_FILENAME_RE.sub(" ", title or "")
+    name = re.sub(r"\s+", " ", name).strip().strip(". ")
+    return name[:120].strip() or "Untitled"
+
+
+def dedupe_name(name: str, used: set[str], sep: str = " ") -> str:
+    """Return name (or name+sep+N) not already in used; records the result in used.
+
+    Compared case-insensitively so collisions match Obsidian's filename resolution.
+    """
+    if name.lower() not in used:
+        used.add(name.lower())
+        return name
+    i = 2
+    while f"{name}{sep}{i}".lower() in used:
+        i += 1
+    final = f"{name}{sep}{i}"
+    used.add(final.lower())
+    return final
+
+
+def make_obsidian_image_namer(slug: str) -> ImageNamer:
+    """Image filenames unique across the whole vault: <slug>-<n>-<shorthash>.<ext>.
+
+    Obsidian resolves ![[name]] embeds by filename vault-wide (ignoring folders), so
+    names must be globally unique; slug + index + content hash guarantees that.
+    """
+
+    def namer(index: int, ext: str, content: bytes) -> str:
+        short = hashlib.sha256(content).hexdigest()[:8]
+        return f"{slug}-{index}-{short}{ext}"
+
+    return namer
+
+
+def obsidian_image_srcer(name: str) -> str:
+    """Obsidian uses a bare filename (resolved vault-wide), not a path."""
+    return name
+
+
+def to_obsidian_embeds(body_md: str) -> str:
+    """Rewrite localized images from Markdown ![alt](file.ext) to Obsidian embeds ![[file.ext]]."""
+    return _BARE_IMAGE_MD_RE.sub(r"![[\1]]", body_md)
+
+
+def write_obsidian_note(
+    out_root: Path,
+    filename: str,
+    title: str,
+    canonical: str | None,
+    body_md: str,
+    slug: str,
+    date: str | None = None,
+    tags: list[str] | None = None,
+) -> Path:
+    """Write one flat Obsidian note: out_root/<filename>.md. Returns the note path."""
+    out_root.mkdir(parents=True, exist_ok=True)
+    front: dict = {"title": title}
+    if date:
+        front["date"] = date
+    if tags:
+        front["tags"] = tags
+    if canonical:
+        front["source"] = canonical
+    if slug:
+        front["aliases"] = [slug]
+    note_path = out_root / f"{filename}.md"
+    note_path.write_text(_render_note(front, body_md), encoding="utf-8")
+    return note_path

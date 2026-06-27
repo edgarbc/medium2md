@@ -185,7 +185,7 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 |---|---|---|
 | 1 — Core conversion | ZIP ingestion, post discovery, HTML→Markdown conversion, Hugo bundle writing, local/remote image localization, slug collision handling | ✅ Implemented |
 | 2 — Content fidelity + verification | Filter out comment/reply stubs (word-count gate, reported + overridable); better metadata extraction (`date`/`tags`/canonical from the body footer); machine-readable conversion report; `verify` command; clearer failure reporting | 📋 Planned |
-| 3 — Obsidian output mode | `--target hugo\|obsidian` output-profile flag; flat `<Title>.md` notes into `--out`; shared `_attachments/` folder with collision-safe `<slug>-<n>-<hash>.<ext>` image names; `![[...]]` embeds; figcaptions as captions; Obsidian front matter (tags/created/source/aliases, no draft/slug); `[[wikilink]]` rewriting between posts | 📋 Planned |
+| 3 — Obsidian output mode | `--target hugo\|obsidian` output-profile flag; flat `<Title>.md` notes into `--out`; shared `_attachments/` folder with collision-safe `<slug>-<n>-<hash>.<ext>` image names; `![[...]]` embeds; figcaptions as italic captions; Obsidian front matter (date/source/aliases, no draft/slug) | ✅ Implemented (wikilink rewriting between posts still planned) |
 | 4 — Incremental + extensibility | Incremental state tracking, embed conversion, optional Pandoc backend, internal link rewriting (Hugo), config/theme front-matter mapping | 📋 Planned |
 
 ### Roadmap status snapshot (code-verified)

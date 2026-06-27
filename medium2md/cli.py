@@ -4,21 +4,39 @@ import tempfile
 import typer
 
 from medium2md.pipeline import (
+    DEFAULT_ATTACHMENTS_DIR,
     find_post_html_files,
     inspect_post,
     classify_stub,
     convert_html_file,
     slug_from_post,
+    dedupe_name,
     write_bundle,
+    make_obsidian_image_namer,
+    obsidian_image_srcer,
+    to_obsidian_embeds,
+    sanitize_note_filename,
+    write_obsidian_note,
 )
 
-app = typer.Typer(help="Convert a Medium export ZIP into Hugo page bundles.")
+app = typer.Typer(help="Convert a Medium export ZIP into Hugo page bundles or Obsidian notes.")
 
 
 @app.command()
 def convert(
     export_zip: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=False),
     out: Path = typer.Option(Path("content/posts"), "--out", "-o"),
+    target: str = typer.Option(
+        "hugo",
+        "--target",
+        "-t",
+        help="Output format: 'hugo' (page bundles) or 'obsidian' (flat notes + shared attachments).",
+    ),
+    attachments_dir: str = typer.Option(
+        DEFAULT_ATTACHMENTS_DIR,
+        "--attachments-dir",
+        help="(obsidian) Shared image folder, relative to --out.",
+    ),
     min_words: int = typer.Option(
         100,
         "--min-words",
@@ -28,6 +46,10 @@ def convert(
         ),
     ),
 ):
+    target = target.lower()
+    if target not in ("hugo", "obsidian"):
+        typer.echo(typer.style(f"Error: --target must be 'hugo' or 'obsidian', got {target!r}.", fg="red"), err=True)
+        raise typer.Exit(2)
     out = out.resolve()
     if not out.exists():
         if not typer.confirm(
@@ -43,6 +65,7 @@ def convert(
 
     typer.echo(f"Export: {export_zip}")
     typer.echo(f"Out:    {out}")
+    typer.echo(f"Target: {target}")
 
     with tempfile.TemporaryDirectory(prefix="medium2md_") as td:
         tmp_dir = Path(td)
@@ -67,6 +90,7 @@ def convert(
             raise typer.Exit(1)
 
         used_slugs: set[str] = set()
+        used_notes: set[str] = set()  # obsidian note filenames (case-insensitive)
         written = 0
         errors = 0
         skipped: list[tuple[str, int]] = []  # (title, word_count) for filtered stubs
@@ -85,20 +109,27 @@ def convert(
                         )
                     )
                     continue
-                slug = slug_from_post(title, canonical)
-                base_slug = slug
-                while slug in used_slugs:
-                    # Simple collision: append -2, -3, ...
-                    suffix = 2 if slug == base_slug else int(slug.split("-")[-1]) + 1
-                    slug = f"{base_slug}-{suffix}"
-                used_slugs.add(slug)
-                bundle_dir = out / slug
-                bundle_dir.mkdir(parents=True, exist_ok=True)
-                title, canonical, date, body_md, num_images = convert_html_file(html_path, tmp_dir, bundle_dir)
-                write_bundle(out, slug, title, canonical, body_md, date)
+                # Unique slug (used for Hugo dirs and for Obsidian image filenames).
+                slug = dedupe_name(slug_from_post(title, canonical), used_slugs, sep="-")
+
+                if target == "obsidian":
+                    images_dir = out / attachments_dir
+                    title, canonical, date, body_md, num_images = convert_html_file(
+                        html_path, tmp_dir, images_dir,
+                        make_obsidian_image_namer(slug), obsidian_image_srcer,
+                    )
+                    body_md = to_obsidian_embeds(body_md)
+                    note_name = dedupe_name(sanitize_note_filename(title), used_notes)
+                    dest = write_obsidian_note(out, note_name, title, canonical, body_md, slug, date)
+                else:
+                    title, canonical, date, body_md, num_images = convert_html_file(
+                        html_path, tmp_dir, out / slug / "images",
+                    )
+                    dest = write_bundle(out, slug, title, canonical, body_md, date)
+
                 written += 1
                 img_info = f" ({num_images} image(s))" if num_images else ""
-                typer.echo(f"  [{i}/{len(post_files)}] {slug}  →  {out / slug / 'index.md'}{img_info}")
+                typer.echo(f"  [{i}/{len(post_files)}] {dest.relative_to(out)}{img_info}")
             except Exception as e:
                 errors += 1
                 typer.echo(

@@ -432,16 +432,16 @@ Emit Obsidian-flavored Markdown notes per post as a co-equal output target to Hu
 - **Front matter:** `title`, `tags` (list), `created`/`date`, `source` (canonical), optional `aliases`; NO `draft`/`slug` keys.
 - **Wikilinks:** rewrite links between converted posts to `[[Note Title]]`.
 
-Tasks:
+Tasks — core DONE (2026-06-26), verified E2E (117 notes + shared _attachments, embeds=attachments, captions italic, Hugo target regression-clean):
 
-- [ ] Output-profile abstraction: factor the write step into a profile interface (Hugo bundle / Obsidian note share parse+convert+localize, differ in layout + front matter + image emission)
-- [ ] `--target hugo|obsidian` flag (default hugo); `--attachments-dir` (default `_attachments`)
-- [ ] Title → filename sanitizer + collision handling (flat into `--out`)
-- [ ] Collision-safe image naming `<slug>-<n>-<shorthash>.<ext>` into the shared attachments folder
-- [ ] `![[...]]` embed emission for localized images
-- [ ] Figcaption → italic caption / embed alt text
-- [ ] Obsidian front matter (`title`/`tags`/`created`/`source`/`aliases`; no `draft`/`slug`)
-- [ ] `[[wikilink]]` rewriting between converted posts
+- [x] Output-profile abstraction: `convert_html_file(images_dir, image_namer, image_srcer)` hooks (Hugo defaults) + separate `write_bundle`/`write_obsidian_note` sharing `_render_note`
+- [x] `--target hugo|obsidian` flag (default hugo); `--attachments-dir` (default `_attachments`)
+- [x] Title → filename: `sanitize_note_filename` + `dedupe_name`; notes flat into `--out`
+- [x] Collision-safe image naming `<slug>-<n>-<shorthash>.<ext>` (`make_obsidian_image_namer`, sha256[:8] of content)
+- [x] `![[...]]` embed emission (`to_obsidian_embeds`); remote/failed URLs stay standard markdown
+- [x] Figcaption → italic caption (`<figcaption>`→`<em>` pre-conversion; benefits Hugo too)
+- [x] Obsidian front matter: title/date/source/aliases[slug]; no draft/slug (tags omitted — export has none)
+- [ ] `[[wikilink]]` rewriting between converted posts — DEFERRED (needs cross-post canonical→title map + 2nd pass; `aliases:[slug]` already lets `[[slug]]` resolve)
 
 ### Milestone 4 (incremental + extensibility / polish)
 
