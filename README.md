@@ -4,6 +4,9 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/medium2md-cli.svg)](https://pypi.org/project/medium2md-cli/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<img width="378" height="280" alt="image" src="https://github.com/user-attachments/assets/4e2a0319-68b2-4207-b570-c4dcf8d33f4e" />
+
+
 > Convert a Medium export ZIP into clean Markdown with localized images, optimized for Hugo and compatible with Obsidian knowledge bases.
 
 **medium2md** is a CLI tool that transforms Medium's HTML export into properly structured Markdown with localized assets. Today, output is optimized for [Hugo](https://gohugo.io/) page bundles and is also readable in [Obsidian](https://obsidian.md/) vaults; planned roadmap work adds stronger Obsidian-specific formatting conventions.
