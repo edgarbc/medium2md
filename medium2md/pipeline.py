@@ -544,3 +544,89 @@ def write_report(path: Path, report: dict) -> None:
     path.write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+
+
+# ---------------------------------------------------------------------------
+# Output verification
+# ---------------------------------------------------------------------------
+
+# A standard Markdown image: ![alt](target ...). Captures the target up to the
+# first whitespace or ')', so an optional "title" after the URL is ignored.
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*([^)\s]+)")
+# An Obsidian embed: ![[name]] — capture the filename, dropping any |alias or #anchor.
+_EMBED_RE = re.compile(r"!\[\[([^\]|#]+)")
+
+
+class VerifyIssue(NamedTuple):
+    """One problem found while verifying converted output."""
+
+    note: str  # path relative to the output dir
+    level: str  # "error" | "warning"
+    kind: str  # "frontmatter" | "broken-image" | "remote-image" | "empty-body"
+    detail: str
+
+
+def _split_front_matter(text: str) -> tuple[dict | None, str, str | None]:
+    """Split a note into (front_matter_dict, body, error). error is set if FM is bad."""
+    if not text.startswith("---"):
+        return None, text, "no YAML front matter"
+    lines = text.split("\n")
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return None, text, "unterminated front matter"
+    body = "\n".join(lines[end + 1 :]).strip()
+    try:
+        front = yaml.safe_load("\n".join(lines[1:end]))
+    except yaml.YAMLError as e:
+        return None, body, f"invalid YAML front matter: {e}"
+    if not isinstance(front, dict):
+        return None, body, "front matter is not a mapping"
+    return front, body, None
+
+
+def verify_output(
+    out_dir: Path,
+    target: str,
+    attachments_dir: str = DEFAULT_ATTACHMENTS_DIR,
+) -> tuple[list[Path], list[VerifyIssue]]:
+    """Check converted output for integrity. Returns (notes_checked, issues).
+
+    Errors (hard): missing/invalid front matter, missing title, broken local image
+    references. Warnings (soft): images left as remote URLs (failed downloads), and
+    empty bodies. For Hugo, notes are <slug>/index.md and local images resolve
+    relative to the bundle; for Obsidian, notes are flat <Title>.md and ![[name]]
+    embeds resolve against the shared attachments dir.
+    """
+    if target == "obsidian":
+        notes = sorted(out_dir.glob("*.md"))
+        att_dir = out_dir / attachments_dir
+    else:
+        notes = sorted(out_dir.glob("*/index.md"))
+        att_dir = None
+
+    issues: list[VerifyIssue] = []
+    for note in notes:
+        rel = str(note.relative_to(out_dir))
+        text = note.read_text(encoding="utf-8", errors="replace")
+        front, body, fm_err = _split_front_matter(text)
+        if fm_err:
+            issues.append(VerifyIssue(rel, "error", "frontmatter", fm_err))
+        elif not front.get("title"):
+            issues.append(VerifyIssue(rel, "error", "frontmatter", "missing 'title'"))
+        if not body.strip():
+            issues.append(VerifyIssue(rel, "warning", "empty-body", "note has no body content"))
+
+        for m in _MD_IMAGE_RE.finditer(body):
+            ref = m.group(1)
+            if ref.startswith(("http://", "https://")):
+                issues.append(VerifyIssue(rel, "warning", "remote-image", ref))
+            elif not (note.parent / ref).is_file():
+                issues.append(VerifyIssue(rel, "error", "broken-image", ref))
+
+        if att_dir is not None:
+            for m in _EMBED_RE.finditer(body):
+                name = m.group(1).strip()
+                if not (att_dir / name).is_file():
+                    issues.append(VerifyIssue(rel, "error", "broken-image", f"![[{name}]]"))
+
+    return notes, issues

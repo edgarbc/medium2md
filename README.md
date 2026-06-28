@@ -64,6 +64,7 @@ Generate correctly formatted Markdown files from Medium posts, with images local
 - Basic slug collision handling (`slug-2`, `slug-3`, …)
 - Terminal progress and summary; per-post image count; prompt to create missing output dir
 - Optional machine-readable JSON conversion report (`--report`): per-post records (source, title, slug/output, images, failed image URLs), skipped stubs with reasons, errors, and run summary counts
+- `verify` command: checks a converted directory for broken local image links and invalid/missing front matter (errors), and reports leftover remote image URLs and empty bodies (warnings); non-zero exit on errors for CI
 
 ### Planned
 
@@ -71,7 +72,6 @@ Generate correctly formatted Markdown files from Medium posts, with images local
 - Incremental runs via state file
 - Embed detection and shortcode conversion (YouTube, Twitter, Gist)
 - Pandoc backend option
-- Verification command
 - Theme-specific front matter mapping
 
 ### Known limitations (current)
@@ -111,7 +111,7 @@ Copy your Medium export ZIP into the `input/` directory (already set up and git-
 
 ```bash
 cp ~/Downloads/medium-export.zip input/
-uv run medium2md input/medium-export.zip --out ../blog/content/posts
+uv run medium2md convert input/medium-export.zip --out ../blog/content/posts
 ```
 
 > **Note:** The `input/` directory is tracked by git (via `.gitkeep`) so it exists after a fresh clone, but its contents are ignored — your ZIP files will never be accidentally committed.
@@ -119,10 +119,21 @@ uv run medium2md input/medium-export.zip --out ../blog/content/posts
 To record a machine-readable summary of the run (useful in CI), pass `--report`:
 
 ```bash
-uv run medium2md input/medium-export.zip --out ../blog/content/posts --report report.json
+uv run medium2md convert input/medium-export.zip --out ../blog/content/posts --report report.json
 ```
 
 The report lists every converted post (source, slug/output path, image count, and any image URLs that failed to download), the skipped comment/reply stubs with their reasons, per-post errors, and run-level summary counts.
+
+### Verifying output
+
+After a conversion, `verify` checks the output directory for integrity — invalid/missing front matter and broken local image links are reported as **errors** (non-zero exit); images left as remote URLs (failed downloads) and empty bodies are **warnings**:
+
+```bash
+uv run medium2md verify ../blog/content/posts            # Hugo bundles
+uv run medium2md verify ./vault --target obsidian        # Obsidian notes (checks ![[...]] embeds)
+```
+
+Use the same `--target` (and `--attachments-dir` for Obsidian) you used for the conversion.
 
 ### Front Matter Example
 
@@ -191,14 +202,14 @@ ZIP → extract → find posts → parse HTML → localize images (copy/download
 | Milestone | Focus | Status |
 |---|---|---|
 | 1 — Core conversion | ZIP ingestion, post discovery, HTML→Markdown conversion, Hugo bundle writing, local/remote image localization, slug collision handling | ✅ Implemented |
-| 2 — Content fidelity + verification | Filter out comment/reply stubs (word-count gate, reported + overridable); better metadata extraction (`date`/`tags`/canonical from the body footer); machine-readable conversion report; `verify` command; clearer failure reporting | 🟡 In progress (stub filtering, `date`/canonical extraction, and `--report` JSON shipped; `verify` command and `tags` still planned) |
+| 2 — Content fidelity + verification | Filter out comment/reply stubs (word-count gate, reported + overridable); better metadata extraction (`date`/`tags`/canonical from the body footer); machine-readable conversion report; `verify` command; clearer failure reporting | ✅ Implemented (stub filtering, `date`/canonical extraction, `--report` JSON, and `verify` all shipped; `tags` omitted — the export HTML carries none) |
 | 3 — Obsidian output mode | `--target hugo\|obsidian` output-profile flag; flat `<Title>.md` notes into `--out`; shared `_attachments/` folder with collision-safe `<slug>-<n>-<hash>.<ext>` image names; `![[...]]` embeds; figcaptions as italic captions; Obsidian front matter (date/source/aliases, no draft/slug) | ✅ Implemented (wikilink rewriting between posts still planned) |
 | 4 — Incremental + extensibility | Incremental state tracking, embed conversion, optional Pandoc backend, internal link rewriting (Hugo), config/theme front-matter mapping | 📋 Planned |
 
 ### Roadmap status snapshot (code-verified)
 
 - The repository has implemented the core `convert` flow end-to-end (Hugo output).
-- Milestone 2 is largely shipped (stub filtering, `date`/canonical extraction, `--report` JSON); the remaining work is a `verify` command (and `tags`, if the export ever carries them).
+- Milestone 2 is complete (stub filtering, `date`/canonical extraction, `--report` JSON, and the `verify` command); `tags` are omitted only because the export HTML carries none.
 - Milestone 3 adds Obsidian as a co-equal output target (alongside Hugo), building on M2's richer metadata.
 - Milestone 4 remains optional/polish after fidelity, verification, and Obsidian output are stable.
 
@@ -211,7 +222,7 @@ Contributions are welcome! To get started:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feat/my-feature`)
 3. Make your changes
-4. Open a pull request (run `uv run medium2md --help` to confirm the CLI works)
+4. Open a pull request (run `uv run medium2md convert --help` to confirm the CLI works)
 
 ---
 

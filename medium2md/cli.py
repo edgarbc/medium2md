@@ -20,6 +20,7 @@ from medium2md.pipeline import (
     obsidian_image_srcer,
     to_obsidian_embeds,
     sanitize_note_filename,
+    verify_output,
     write_obsidian_note,
     write_report,
 )
@@ -56,6 +57,7 @@ def convert(
         help="Write a machine-readable JSON conversion report to this path.",
     ),
 ):
+    """Convert a Medium export ZIP into Hugo page bundles or Obsidian notes."""
     target = target.lower()
     if target not in ("hugo", "obsidian"):
         typer.echo(typer.style(f"Error: --target must be 'hugo' or 'obsidian', got {target!r}.", fg="red"), err=True)
@@ -218,3 +220,60 @@ def convert(
                 err=True,
             )
             raise typer.Exit(1)
+
+
+@app.command()
+def verify(
+    out: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True),
+    target: str = typer.Option(
+        "hugo",
+        "--target",
+        "-t",
+        help="Output format to verify: 'hugo' (page bundles) or 'obsidian' (flat notes).",
+    ),
+    attachments_dir: str = typer.Option(
+        DEFAULT_ATTACHMENTS_DIR,
+        "--attachments-dir",
+        help="(obsidian) Shared image folder, relative to the output dir.",
+    ),
+):
+    """Check a converted output directory for integrity (front matter, image links)."""
+    target = target.lower()
+    if target not in ("hugo", "obsidian"):
+        typer.echo(typer.style(f"Error: --target must be 'hugo' or 'obsidian', got {target!r}.", fg="red"), err=True)
+        raise typer.Exit(2)
+    out = out.resolve()
+
+    notes, issues = verify_output(out, target, attachments_dir)
+    if not notes:
+        pattern = "*.md" if target == "obsidian" else "*/index.md"
+        typer.echo(
+            typer.style(
+                f"No {target} notes ({pattern}) found under {out}. Wrong --target or directory?",
+                fg="yellow",
+            ),
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    errors = [i for i in issues if i.level == "error"]
+    warnings = [i for i in issues if i.level == "warning"]
+
+    # Errors first, then warnings; grouped enough to scan by note.
+    for issue in sorted(issues, key=lambda i: (i.level != "error", i.note, i.kind)):
+        color = "red" if issue.level == "error" else "yellow"
+        typer.echo(
+            typer.style(f"  {issue.level.upper():7} [{issue.kind}] {issue.note}: {issue.detail}", fg=color),
+            err=issue.level == "error",
+        )
+
+    typer.echo("")
+    style = "red" if errors else ("yellow" if warnings else "green")
+    typer.echo(
+        typer.style(
+            f"Checked {len(notes)} note(s): {len(errors)} error(s), {len(warnings)} warning(s).",
+            fg=style,
+        )
+    )
+    if errors:
+        raise typer.Exit(1)
