@@ -1,10 +1,11 @@
 """Minimal conversion pipeline: find post HTML, parse, convert to Markdown, write Hugo bundles."""
 
 import hashlib
+import json
 import re
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple
 from urllib.parse import urlparse
 
 import yaml
@@ -12,6 +13,8 @@ from bs4 import BeautifulSoup
 from dateutil import parser as dateparser
 from markdownify import markdownify as md
 from slugify import slugify
+
+from medium2md import __version__
 
 # Image-handling hooks that differ per output target.
 ImageNamer = Callable[[int, str, bytes], str]  # (index, ext, content) -> filename
@@ -216,17 +219,19 @@ def _localize_images(
     images_dir: Path,
     image_namer: "ImageNamer",
     image_srcer: "ImageSrcer",
-) -> int:
+) -> tuple[int, list[str]]:
     """In-place: resolve each <img> to a local file or download it into images_dir.
 
     image_namer(index, ext, content) chooses the saved filename; image_srcer(name)
     chooses what to write back into the <img src> (a bundle-relative path for Hugo,
-    a bare filename for Obsidian). Returns the count of images localized. Images that
-    can't be resolved/downloaded keep their original src (so the URL survives in the MD).
+    a bare filename for Obsidian). Returns (count_localized, failed_remote_urls).
+    Remote images that can't be downloaded keep their original src (so the URL
+    survives in the MD) and their URL is reported as a failure.
     """
     images_dir.mkdir(parents=True, exist_ok=True)
     imgs = article_soup.find_all("img", src=True)
     localized = 0
+    failed: list[str] = []
     for i, img in enumerate(imgs, 1):
         src = img["src"].strip()
         if not src:
@@ -249,6 +254,7 @@ def _localize_images(
             continue
         # Remote URL: download (with User-Agent and retry so CDNs don't block)
         if not httpx:
+            failed.append(src)
             continue
         last_error: Exception | None = None
         for attempt in range(2):
@@ -276,8 +282,8 @@ def _localize_images(
                     time.sleep(0.5 + attempt)
         if last_error is not None:
             # Leave src unchanged so the MD still has the URL; user can fix manually
-            pass
-    return localized
+            failed.append(src)
+    return localized, failed
 
 
 def _hugo_image_namer(index: int, ext: str, content: bytes) -> str:
@@ -288,14 +294,25 @@ def _hugo_image_srcer(name: str) -> str:
     return f"images/{name}"
 
 
+class ConversionResult(NamedTuple):
+    """Outcome of converting one post HTML file."""
+
+    title: str
+    canonical: str | None
+    date: str | None
+    body_md: str
+    num_images: int  # images localized (copied or downloaded)
+    failed_images: list[str]  # remote URLs that could not be downloaded
+
+
 def convert_html_file(
     html_path: Path,
     tmp_dir: Path,
     images_dir: Path,
     image_namer: "ImageNamer" = _hugo_image_namer,
     image_srcer: "ImageSrcer" = _hugo_image_srcer,
-) -> tuple[str, str | None, str | None, str, int]:
-    """Parse one post HTML file, localize images into images_dir, return (title, canonical_url, date, markdown_body, num_images_localized).
+) -> ConversionResult:
+    """Parse one post HTML file, localize images into images_dir, return a ConversionResult.
 
     image_namer/image_srcer control how images are named and referenced; they default to
     the Hugo scheme (images/<n>.<ext>). Pass Obsidian variants for the Obsidian target.
@@ -309,6 +326,7 @@ def convert_html_file(
     if not article_html:
         body_md = ""
         localized = 0
+        failed: list[str] = []
     else:
         article_soup = BeautifulSoup(article_html, "lxml")
         # Drop the Medium export footer (author/date/canonical/"Exported from Medium");
@@ -322,7 +340,7 @@ def convert_html_file(
                 for child in list(fc.contents):
                     em.append(child.extract())
                 fc.append(em)
-        localized = _localize_images(
+        localized, failed = _localize_images(
             article_soup, html_path, tmp_dir, images_dir, image_namer, image_srcer
         )
         body_md = md(
@@ -332,7 +350,7 @@ def convert_html_file(
             escape_asterisks=False,
             escape_underscores=False,
         )
-    return title, canonical, date, (body_md or "").strip(), localized
+    return ConversionResult(title, canonical, date, (body_md or "").strip(), localized, failed)
 
 
 def slug_from_post(title: str, canonical: str | None) -> str:
@@ -470,3 +488,59 @@ def write_obsidian_note(
     note_path = out_root / f"{filename}.md"
     note_path.write_text(_render_note(front, body_md), encoding="utf-8")
     return note_path
+
+
+# ---------------------------------------------------------------------------
+# Machine-readable conversion report
+# ---------------------------------------------------------------------------
+
+
+def build_report(
+    *,
+    export_zip: Path,
+    out: Path,
+    target: str,
+    options: dict,
+    html_files: int,
+    posts_considered: int,
+    written: list[dict],
+    skipped: list[dict],
+    errors: list[dict],
+    generated_at: str,
+) -> dict:
+    """Assemble the conversion report as a JSON-serializable dict.
+
+    Pure: the timestamp is passed in (generated_at) so conversion content stays
+    deterministic and this stays unit-testable without a clock. `written`,
+    `skipped`, and `errors` are the per-post record lists collected during the run.
+    """
+    summary = {
+        "html_files": html_files,
+        "posts_considered": posts_considered,
+        "written": len(written),
+        "skipped": len(skipped),
+        "errors": len(errors),
+        "images_localized": sum(p.get("images", 0) for p in written),
+        "images_failed": sum(len(p.get("images_failed", [])) for p in written),
+    }
+    return {
+        "tool": "medium2md",
+        "version": __version__,
+        "generated_at": generated_at,
+        "export": str(export_zip),
+        "out": str(out),
+        "target": target,
+        "options": options,
+        "summary": summary,
+        "posts": written,
+        "skipped": skipped,
+        "errors": errors,
+    }
+
+
+def write_report(path: Path, report: dict) -> None:
+    """Write the report dict to path as pretty-printed JSON (UTF-8, trailing newline)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
