@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "medium2md-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Convert a Medium export ZIP into Hugo-ready Markdown page bundles with localized images."
 readme = "README.md"
 license = { text = "MIT" }
